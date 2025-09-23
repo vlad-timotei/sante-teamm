@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Sante PDF Batch Extractor",
+  "version": "1.0",
+  "description": "Batch extract data from PDFs on rezultateptmedici.clinica-sante.ro",
+
+  "permissions": [
+    "webRequest",
+    "storage",
+    "downloads"
+  ],
+
+  "host_permissions": [
+    "*://rezultateptmedici.clinica-sante.ro/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://rezultateptmedici.clinica-sante.ro/*"],
+      "js": ["pdf.min.js", "pdf-processor.js", "content.js"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["pdf.worker.min.js", "pdf.min.js"],
+      "matches": ["*://rezultateptmedici.clinica-sante.ro/*"]
+    }
+  ]
+}
