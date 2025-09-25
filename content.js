@@ -28,6 +28,12 @@ async function initializeBatchExtension() {
   if (downloadElements.length > 0) {
     injectBatchButtons(downloadElements);
     createSingleProcessButton();
+
+    // Check for stored CSV data after everything is set up
+    setTimeout(() => {
+      // Try to load stored data even if prefix field is empty by checking localStorage for any stored prefixes
+      tryLoadAnyStoredData();
+    }, 500);
   }
 }
 
@@ -73,23 +79,23 @@ function addTestResultsColumn() {
     const batchHeaderCell = document.createElement("th");
     batchHeaderCell.textContent = "Export";
     batchHeaderCell.style.cssText = `
-      background: #f8f9fa;
-      border: 1px solid #dee2e6;
-      padding: 8px;
-      font-weight: bold;
-      width: 80px;
-    `;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 8px;
+  font-weight: bold;
+  width: 80px;
+`;
     headerRow.appendChild(batchHeaderCell);
 
     // Add Test Results header
     const testResultsHeaderCell = document.createElement("th");
     testResultsHeaderCell.textContent = "Results";
     testResultsHeaderCell.style.cssText = `
-      background: #f8f9fa;
-      border: 1px solid #dee2e6;
-      padding: 8px;
-      font-weight: bold;
-    `;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 8px;
+  font-weight: bold;
+`;
     headerRow.appendChild(testResultsHeaderCell);
     console.log("✅ Added batch processing and test results headers");
   } else {
@@ -133,34 +139,34 @@ function addTestResultsColumn() {
     const batchCell = document.createElement("td");
     batchCell.id = `batch-cell-${index}`;
     batchCell.style.cssText = `
-      border: 1px solid #dee2e6;
-      padding: 8px;
-      text-align: center;
-      white-space: nowrap;
-    `;
+  border: 1px solid #dee2e6;
+  padding: 8px;
+  text-align: center;
+  white-space: nowrap;
+`;
 
     // Create container for button and input
     const container = document.createElement("div");
     container.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      justify-content: center;
-    `;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: center;
+`;
 
     // Create batch button
     const batchBtn = document.createElement("button");
     batchBtn.textContent = "+";
     batchBtn.style.cssText = `
-      background: #007cba;
-      color: white;
-      border: none;
-      padding: 5px 8px;
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 12px;
-      flex-shrink: 0;
-    `;
+  background: #007cba;
+  color: white;
+  border: none;
+  padding: 5px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+`;
 
     batchBtn.onclick = (e) => {
       e.preventDefault();
@@ -171,15 +177,15 @@ function addTestResultsColumn() {
     const textInput = document.createElement("input");
     textInput.type = "text";
     textInput.id = `patient-text-${index}`;
-    textInput.setAttribute('data-link-id', downloadLink.id); // Store link ID for easier matching
+    textInput.setAttribute("data-link-id", downloadLink.id); // Store link ID for easier matching
     textInput.placeholder = "*ID";
     textInput.style.cssText = `
-      padding: 3px 6px;
-      border: 1px solid #ccc;
-      border-radius: 2px;
-      font-size: 11px;
-      width: 30px;
-    `;
+  padding: 3px 6px;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  font-size: 11px;
+  width: 30px;
+`;
 
     container.appendChild(batchBtn);
     container.appendChild(textInput);
@@ -189,14 +195,14 @@ function addTestResultsColumn() {
     const testResultsCell = document.createElement("td");
     testResultsCell.id = `test-results-${index}`;
     testResultsCell.style.cssText = `
-      border: 1px solid #dee2e6;
-      padding: 8px;
-      font-size: 12px;
-      color: #666;
-      max-width: 200px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    `;
+  border: 1px solid #dee2e6;
+  padding: 8px;
+  font-size: 12px;
+  color: #666;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
     testResultsCell.textContent = "-";
     testResultsCell.setAttribute("data-link-id", downloadLink.id);
 
@@ -285,58 +291,73 @@ function createSingleProcessButton() {
   // Create compact button container
   const buttonContainer = document.createElement("div");
   buttonContainer.style.cssText = `
-    margin: 10px 0;
-    padding: 8px 12px;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
+margin: 10px 0;
+padding: 8px 12px;
+background: #f8f9fa;
+border: 1px solid #dee2e6;
+border-radius: 4px;
   `;
 
   buttonContainer.innerHTML = `
-    <div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
-      <input type="text" id="id-prefix" placeholder="ID Prefix" style="
-        padding: 4px 8px;
-        border: 1px solid #ccc;
-        border-radius: 3px;
-        font-size: 12px;
-        width: 80px;
-      ">
-      <label for="csv-upload" style="
-        background: #28a745;
-        color: white;
-        padding: 6px 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: bold;
-        border: 2px solid #28a745;
-        display: inline-block;
-        text-align: center;
-        transition: all 0.2s;
-      " onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">
-        📁 Choose CSV File
-      </label>
-      <input type="file" id="csv-upload" accept=".csv" style="display: none;">
-      <button type="button" id="sante-process-export" style="
-        background: #6c757d;
-        color: white;
-        border: none;
-        padding: 6px 12px;
-        border-radius: 3px;
-        cursor: not-allowed;
-        font-size: 12px;
-        opacity: 0.6;
-      " disabled>
-        📥 Export (<span id="exported-count">0</span>)
-      </button>
-    </div>
-    <div id="match-results" style="display: none;"></div>
+<div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
+  <input type="hidden" id="id-prefix">
+  <label for="csv-upload" style="
+    background: #28a745;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    border: 2px solid #28a745;
+    display: inline-block;
+    text-align: center;
+    transition: all 0.2s;
+  " onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">
+    📁 Choose CSV File
+  </label>
+  <input type="file" id="csv-upload" accept=".csv" style="display: none;">
+  <button type="button" id="sante-download-all" style="
+    background: #6c757d;
+    color: white;
+    border: 2px solid #6c757d;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: not-allowed;
+    font-size: 12px;
+    font-weight: bold;
+    opacity: 0.6;
+    display: inline-block;
+    text-align: center;
+    transition: all 0.2s;
+  " disabled>
+    📥 Download All (<span id="download-count">0</span>)
+  </button>
+  <button type="button" id="sante-process-export" style="
+    background: #6c757d;
+    color: white;
+    border: 2px solid #6c757d;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: not-allowed;
+    font-size: 12px;
+    font-weight: bold;
+    opacity: 0.6;
+    display: inline-block;
+    text-align: center;
+    transition: all 0.2s;
+  " disabled>
+    📥 Export (<span id="exported-count">0</span>)
+  </button>
+</div>
+<div id="match-results" style="display: none;"></div>
   `;
 
   // Insert before the table
   table.parentNode.insertBefore(buttonContainer, table);
 
   document.getElementById("sante-process-export").onclick = exportData;
+  document.getElementById("sante-download-all").onclick = downloadAllWithIDs;
 
   // Auto-submit CSV when file is selected
   const csvFileInput = document.getElementById("csv-upload");
@@ -377,6 +398,43 @@ async function addToBatch(element, index, batchBtn) {
   const row = element.closest("tr");
   const cells = row.querySelectorAll("td");
 
+  // Check patient status before processing
+  const statusIcon = row.querySelector(".glyphicon");
+  if (statusIcon) {
+    const statusTitle = statusIcon.getAttribute("title");
+    console.log(`🔍 Checking status for patient: ${statusTitle}`);
+
+    // Block patients with "In lucru" status
+    if (statusTitle === "In lucru") {
+      alert(
+        `Cannot process patient: Status is "${statusTitle}". Only patients with "Efectuat cu rezultate" status can be processed.`
+      );
+      console.log(
+        `❌ BLOCKED: Patient has "In lucru" status - processing would fail`
+      );
+      return;
+    }
+
+    // Only allow patients with "Efectuat cu rezultate" status
+    if (statusTitle !== "Efectuat cu rezultate") {
+      alert(
+        `Cannot process patient: Status is "${statusTitle}". Only patients with "Efectuat cu rezultate" status can be processed.`
+      );
+      console.log(
+        `❌ BLOCKED: Patient status "${statusTitle}" - only "Efectuat cu rezultate" allowed`
+      );
+      return;
+    }
+
+    console.log(
+      `✅ STATUS OK: Patient has "${statusTitle}" status - processing allowed`
+    );
+  } else {
+    console.warn(
+      `⚠️ No status icon found for patient - proceeding with caution`
+    );
+  }
+
   const patientData = {
     nrDoc: cells[0]?.textContent.trim(),
     nume: cells[1]?.textContent.trim(),
@@ -402,23 +460,8 @@ async function addToBatch(element, index, batchBtn) {
 
   batchQueue.push(batchItem);
 
-  // Try to send to background script with error handling
-  try {
-    chrome.runtime.sendMessage(
-      {
-        action: "addToBatch",
-        ...batchItem,
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.log("Background not available, working locally only");
-        }
-        // Continue regardless of background script response
-      }
-    );
-  } catch (error) {
-    console.log("Extension messaging not available, working locally");
-  }
+  // Store locally (Chrome extension background script removed for Tampermonkey)
+  console.log("Storing batch item locally:", batchItem);
 
   updateBatchCount(batchQueue.length);
 
@@ -481,13 +524,40 @@ async function addToBatch(element, index, batchBtn) {
     );
     updateExportCount();
   } catch (error) {
+    // Isolated error handling - this failure should not affect other downloads
     console.error(
       `%c❌ AUTO-PROCESSING FAILED: ${patientData.nume}`,
       "color: red; font-weight: bold",
       error
     );
+    console.error(`🔥 Error details for ${patientData.nume}:`, error);
+
+    // Update button to show error but keep it functional for retry
     batchBtn.textContent = "❌";
     batchBtn.style.background = "#dc3545";
+    batchBtn.title = `Error: ${error.message}. Click to retry.`;
+
+    // Reset batch state so the button can be clicked again
+    batchBtn.setAttribute("data-batched", "false");
+
+    // Clear any error styling to make it clear this can be retried
+    batchBtn.style.opacity = "1";
+    batchBtn.onclick = (e) => {
+      e.preventDefault();
+      // Clear previous error state completely
+      batchBtn.textContent = "+";
+      batchBtn.style.background = "#007cba";
+      batchBtn.title = "";
+      // Re-trigger the batch processing
+      toggleBatch(element, index, batchBtn);
+    };
+
+    // Log that other downloads should continue normally
+    console.log(
+      `%c⏭️ ERROR ISOLATED: Other downloads will continue normally`,
+      "color: orange; font-weight: bold"
+    );
+
     updateExportCount();
   }
 }
@@ -554,13 +624,13 @@ function removeFromBatch(element, index, batchBtn) {
       const indicator = document.createElement("div");
       indicator.className = "excluded-indicator";
       indicator.style.cssText = `
-        background: #6c757d;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 10px;
-        margin-top: 5px;
-      `;
+    background: #6c757d;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-top: 5px;
+  `;
       indicator.textContent = "🚫 Excluded from export";
       testResultCell.appendChild(indicator);
     }
@@ -734,16 +804,8 @@ function clearAllData() {
   extractedData = [];
   batchCounter = 0;
 
-  // Try to clear background data too
-  try {
-    chrome.runtime.sendMessage({ action: "clearBatch" }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.log("Background not available for clearing");
-      }
-    });
-  } catch (error) {
-    console.log("Extension messaging not available");
-  }
+  // Background data clearing removed for Tampermonkey compatibility
+  console.log("Batch data cleared locally");
 
   updateBatchCount(0);
 
@@ -788,16 +850,159 @@ function updateExportCount() {
       // Enable button when results are available
       exportButton.disabled = false;
       exportButton.style.background = "#007cba";
+      exportButton.style.borderColor = "#007cba";
       exportButton.style.cursor = "pointer";
       exportButton.style.opacity = "1";
     } else {
       // Disable button when no results are available
       exportButton.disabled = true;
       exportButton.style.background = "#6c757d";
+      exportButton.style.borderColor = "#6c757d";
       exportButton.style.cursor = "not-allowed";
       exportButton.style.opacity = "0.6";
     }
   }
+}
+
+function updateDownloadCount() {
+  // Count how many patients have ID suffixes filled in AND have ready status
+  const patientInputs = document.querySelectorAll('input[id^="patient-text-"]');
+  const downloadCount = Array.from(patientInputs).filter((input) => {
+    if (input.value.trim() === "") return false;
+
+    // Check patient status
+    const row = input.closest("tr");
+    const statusIcon = row?.querySelector(".glyphicon");
+
+    if (statusIcon) {
+      const statusTitle = statusIcon.getAttribute("title");
+      // Only count patients with ready status
+      return statusTitle === "Efectuat cu rezultate";
+    }
+
+    // If no status found, don't count (safer approach)
+    return false;
+  }).length;
+
+  const countElement = document.getElementById("download-count");
+  const downloadButton = document.getElementById("sante-download-all");
+
+  if (countElement) {
+    countElement.textContent = downloadCount;
+  }
+
+  if (downloadButton) {
+    if (downloadCount > 0) {
+      // Enable button when patients with IDs are available
+      downloadButton.disabled = false;
+      downloadButton.style.background = "#ffc107";
+      downloadButton.style.borderColor = "#ffc107";
+      downloadButton.style.color = "#212529";
+      downloadButton.style.cursor = "pointer";
+      downloadButton.style.opacity = "1";
+    } else {
+      // Disable button when no patients have IDs
+      downloadButton.disabled = true;
+      downloadButton.style.background = "#6c757d";
+      downloadButton.style.borderColor = "#6c757d";
+      downloadButton.style.color = "white";
+      downloadButton.style.cursor = "not-allowed";
+      downloadButton.style.opacity = "0.6";
+    }
+  }
+}
+
+async function downloadAllWithIDs() {
+  console.log("🔄 Starting download all with IDs...");
+
+  // Find all patients with filled ID suffixes
+  const patientInputs = document.querySelectorAll('input[id^="patient-text-"]');
+  const patientsWithIDs = [];
+
+  patientInputs.forEach((input) => {
+    const idSuffix = input.value.trim();
+    if (idSuffix !== "") {
+      // Check patient status before adding to download list
+      const row = input.closest("tr");
+      const statusIcon = row?.querySelector(".glyphicon");
+
+      if (statusIcon) {
+        const statusTitle = statusIcon.getAttribute("title");
+
+        // Skip patients with non-ready status
+        if (
+          statusTitle === "In lucru" ||
+          statusTitle !== "Efectuat cu rezultate"
+        ) {
+          console.log(
+            `⏭️ Skipping patient with ID suffix ${idSuffix} - status: "${statusTitle}"`
+          );
+          return;
+        }
+
+        console.log(
+          `✅ Including patient with ID suffix ${idSuffix} - status: "${statusTitle}"`
+        );
+      }
+
+      // Find the corresponding batch button
+      const batchButton = findBatchButtonForInput(input);
+      if (batchButton) {
+        patientsWithIDs.push({
+          input: input,
+          button: batchButton,
+          suffix: idSuffix,
+        });
+      }
+    }
+  });
+
+  if (patientsWithIDs.length === 0) {
+    const totalWithIDs = Array.from(patientInputs).filter(
+      (input) => input.value.trim() !== ""
+    ).length;
+    if (totalWithIDs > 0) {
+      alert(
+        `Found ${totalWithIDs} patients with IDs, but none have "Efectuat cu rezultate" status. Only patients with ready status can be downloaded.`
+      );
+    } else {
+      alert("No patients with ID suffixes found!");
+    }
+    return;
+  }
+
+  console.log(
+    `📥 Found ${patientsWithIDs.length} patients with IDs to download`
+  );
+
+  // Trigger batch processing for each patient with a delay to avoid overwhelming the server
+  // Each download is isolated - if one fails, others will continue
+  for (let i = 0; i < patientsWithIDs.length; i++) {
+    const patient = patientsWithIDs[i];
+    console.log(
+      `📥 Triggering download ${i + 1}/${
+        patientsWithIDs.length
+      } for ID suffix: ${patient.suffix}`
+    );
+
+    setTimeout(() => {
+      try {
+        console.log(`🔄 Processing patient with ID suffix: ${patient.suffix}`);
+        patient.button.click();
+      } catch (error) {
+        console.error(
+          `❌ Failed to trigger download for ID suffix: ${patient.suffix}`,
+          error
+        );
+        console.log(`⏭️ Continuing with next download...`);
+        // Error is isolated, other downloads will continue
+      }
+    }, i * 500); // 500ms delay between each download
+  }
+
+  console.log(
+    `✅ Triggered downloads for ${patientsWithIDs.length} patients (with error isolation)`
+  );
 }
 
 function updateTestResultsColumn(elementIndex, extractedData) {
@@ -823,8 +1028,8 @@ function updateTestResultsColumn(elementIndex, extractedData) {
   // Format test results for display
   if (extractedData.error) {
     testResultCell.innerHTML = `
-      <span style="color: #dc3545;">❌ Error: ${extractedData.error}</span>
-    `;
+  <span style="color: #dc3545;">❌ Error: ${extractedData.error}</span>
+`;
     return;
   }
 
@@ -833,8 +1038,8 @@ function updateTestResultsColumn(elementIndex, extractedData) {
 
   if (testCount === 0) {
     testResultCell.innerHTML = `
-      <span style="color: #ffc107;">⚠️ No tests found</span>
-    `;
+  <span style="color: #ffc107;">⚠️ No tests found</span>
+`;
     return;
   }
 
@@ -1031,16 +1236,92 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
             );
           }
 
-          // Process the PDF content
+          // Process the PDF content with a fresh PDF processor instance
           try {
             console.log(
               `%c🔍 STARTING PDF TEXT EXTRACTION for ${patientName}`,
               "color: blue"
             );
-            const extractedPDFData = await pdfProcessor.extractTextFromPDF(
-              arrayBuffer,
-              batchItem.patientData
-            );
+
+            // Create a fresh PDF processor instance to avoid state corruption
+            let isolatedProcessor = null;
+            try {
+              isolatedProcessor = new PDFProcessor();
+              await isolatedProcessor.loadPDFJS();
+              console.log(
+                `🔄 Created fresh PDF processor instance for ${patientName}`
+              );
+            } catch (processorError) {
+              console.warn(
+                `⚠️ Could not create fresh PDF processor, using global instance:`,
+                processorError
+              );
+              isolatedProcessor = pdfProcessor;
+            }
+
+            // Add extra protection against PDF.js global state corruption
+            let processingResult = null;
+            try {
+              // Create a timeout promise to prevent hanging
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(
+                  () =>
+                    reject(
+                      new Error("PDF processing timeout after 30 seconds")
+                    ),
+                  30000
+                );
+              });
+
+              // Race the PDF processing against timeout
+              processingResult = await Promise.race([
+                isolatedProcessor.extractTextFromPDF(
+                  arrayBuffer,
+                  batchItem.patientData
+                ),
+                timeoutPromise,
+              ]);
+
+              console.log(
+                `✅ PDF processing completed successfully for ${patientName}`
+              );
+            } catch (pdfProcessingError) {
+              // Handle specific PDF.js errors
+              const isInvalidPDF =
+                pdfProcessingError.name === "InvalidPDFException" ||
+                pdfProcessingError.message.includes("Invalid PDF structure");
+
+              console.error(
+                `❌ PDF processing failed for ${patientName}:`,
+                pdfProcessingError
+              );
+
+              if (isInvalidPDF) {
+                console.log(
+                  `🔍 Detected corrupted/invalid PDF file for ${patientName}`
+                );
+                // Force cleanup of PDF.js state
+                if (typeof window.pdfjsLib !== "undefined") {
+                  try {
+                    // Clear any cached PDF documents
+                    window.pdfjsLib.PDFWorker.cleanup();
+                    console.log(
+                      `🧹 Forced PDF.js worker cleanup after invalid PDF`
+                    );
+                  } catch (cleanupError) {
+                    console.warn(
+                      `⚠️ Could not cleanup PDF.js worker:`,
+                      cleanupError
+                    );
+                  }
+                }
+              }
+
+              // Re-throw to be handled by outer catch
+              throw pdfProcessingError;
+            }
+
+            const extractedPDFData = processingResult;
 
             console.log(
               `%c✅ PDF EXTRACTION COMPLETE for ${patientName}`,
@@ -1074,6 +1355,21 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
             // Update test results column
             updateTestResultsColumn(batchItem.elementIndex, extractedPDFData);
 
+            // Clean up isolated processor if it was created
+            try {
+              if (isolatedProcessor && isolatedProcessor !== pdfProcessor) {
+                isolatedProcessor = null;
+                console.log(
+                  `🧹 Cleaned up isolated PDF processor instance for ${patientName} (success)`
+                );
+              }
+            } catch (cleanupError) {
+              console.warn(
+                `⚠️ Could not clean up isolated PDF processor:`,
+                cleanupError
+              );
+            }
+
             resolve(extractedPDFData);
           } catch (pdfError) {
             const errorMsg = `PDF text extraction failed for ${patientName}: ${pdfError.message}`;
@@ -1095,6 +1391,49 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
             // Update test results column with error
             updateTestResultsColumn(batchItem.elementIndex, errorData);
 
+            // Clean up isolated processor if it was created
+            try {
+              if (isolatedProcessor && isolatedProcessor !== pdfProcessor) {
+                isolatedProcessor = null;
+                console.log(
+                  `🧹 Cleaned up isolated PDF processor instance for ${patientName}`
+                );
+              }
+            } catch (cleanupError) {
+              console.warn(
+                `⚠️ Could not clean up isolated PDF processor:`,
+                cleanupError
+              );
+            }
+
+            // Additional PDF.js global cleanup for InvalidPDFException
+            const isInvalidPDF =
+              pdfError.name === "InvalidPDFException" ||
+              pdfError.message.includes("Invalid PDF structure");
+            if (isInvalidPDF) {
+              try {
+                // Force more aggressive cleanup
+                if (typeof window.pdfjsLib !== "undefined") {
+                  window.pdfjsLib.PDFWorker.cleanup();
+                }
+                // Clear any potential cached state
+                if (typeof window.pdfjsWorker !== "undefined") {
+                  window.pdfjsWorker = null;
+                }
+                console.log(
+                  `🧹 Performed aggressive PDF.js cleanup after InvalidPDFException`
+                );
+              } catch (aggressiveCleanupError) {
+                console.warn(
+                  `⚠️ Aggressive PDF.js cleanup failed:`,
+                  aggressiveCleanupError
+                );
+              }
+            }
+
+            console.log(
+              `⏭️ PDF processing error isolated with fresh processor - next downloads will use clean state`
+            );
             resolve();
           }
         })
@@ -1102,7 +1441,27 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
           const errorMsg = `PDF download failed for ${patientName}: ${error.message}`;
           console.error(`%c❌ ${errorMsg}`, "color: red; font-weight: bold");
           console.error(`🔥 Download error details:`, error);
-          reject(error);
+
+          // Create error data entry for tracking
+          const errorData = {
+            id: batchItem.id,
+            patientInfo: batchItem.patientData,
+            extractionDate: new Date().toISOString(),
+            error: "Download failed: " + error.message,
+            status: "DOWNLOAD_ERROR",
+            errorDetails: error.toString(),
+          };
+          extractedData.push(errorData);
+
+          // Update test results column with error
+          updateTestResultsColumn(batchItem.elementIndex, errorData);
+
+          console.log(
+            `⏭️ Download error isolated - next downloads will continue normally`
+          );
+
+          // Resolve instead of reject to prevent error propagation
+          resolve(errorData);
         })
         .finally(() => {
           // Clean up
@@ -1213,8 +1572,219 @@ function downloadCSV(content, filename) {
 // CSV Upload and Matching functionality
 let csvPatientData = []; // Store uploaded CSV data
 
+// Local Storage functions for CSV data
+function getStoredCSVKey(idPrefix) {
+  return `sante-csv-${idPrefix}`;
+}
+
+function storeCSVData(idPrefix, csvData) {
+  const key = getStoredCSVKey(idPrefix);
+  try {
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        data: csvData,
+        timestamp: Date.now(),
+        count: csvData.length,
+      })
+    );
+    console.log(
+      `💾 Stored CSV data for prefix ${idPrefix}: ${csvData.length} patients`
+    );
+  } catch (error) {
+    console.error("Failed to store CSV data:", error);
+  }
+}
+
+function getStoredCSVData(idPrefix) {
+  const key = getStoredCSVKey(idPrefix);
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      console.log(
+        `📱 Retrieved stored CSV data for prefix ${idPrefix}: ${
+          parsed.count
+        } patients (stored ${new Date(parsed.timestamp).toLocaleString()})`
+      );
+      return parsed.data;
+    }
+  } catch (error) {
+    console.error("Failed to retrieve CSV data:", error);
+  }
+  return null;
+}
+
+function clearStoredCSVData(idPrefix) {
+  const key = getStoredCSVKey(idPrefix);
+  localStorage.removeItem(key);
+  console.log(`🗑️ Cleared stored CSV data for prefix ${idPrefix}`);
+}
+
+function tryLoadAnyStoredData() {
+  console.log("🔍 Trying to load any available stored CSV data...");
+
+  // First try the current ID prefix if it exists
+  const idPrefixInput = document.getElementById("id-prefix");
+  if (idPrefixInput && idPrefixInput.value.trim()) {
+    checkForStoredCSVData();
+    return;
+  }
+
+  // If no prefix is set, look for any stored CSV data in localStorage
+  console.log(
+    "🔍 No ID prefix set, scanning localStorage for any stored CSV data..."
+  );
+
+  const storedPrefixes = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("sante-csv-")) {
+      const prefix = key.replace("sante-csv-", "");
+      storedPrefixes.push(prefix);
+    }
+  }
+
+  console.log(
+    `Found ${storedPrefixes.length} stored prefixes:`,
+    storedPrefixes
+  );
+
+  // If we found stored prefixes, try to load the most recently used one
+  if (storedPrefixes.length > 0) {
+    // Get the most recent one by checking timestamps
+    let mostRecentPrefix = storedPrefixes[0];
+    let mostRecentTime = 0;
+
+    storedPrefixes.forEach((prefix) => {
+      const data = getStoredCSVData(prefix);
+      if (data) {
+        const key = getStoredCSVKey(prefix);
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.timestamp > mostRecentTime) {
+            mostRecentTime = parsed.timestamp;
+            mostRecentPrefix = prefix;
+          }
+        }
+      }
+    });
+
+    // Load the most recent data
+    console.log(
+      `📅 Loading most recent CSV data for prefix: ${mostRecentPrefix}`
+    );
+    if (idPrefixInput) {
+      idPrefixInput.value = mostRecentPrefix;
+    }
+    checkForStoredCSVData();
+  } else {
+    console.log("❌ No stored CSV data found in localStorage");
+  }
+}
+
+function checkForStoredCSVData() {
+  console.log("🔍 Checking for stored CSV data...");
+
+  const idPrefixInput = document.getElementById("id-prefix");
+  if (!idPrefixInput) {
+    console.log("❌ ID prefix input not found");
+    return;
+  }
+
+  const idPrefix = idPrefixInput.value.trim();
+  if (!idPrefix) {
+    console.log("❌ No ID prefix entered");
+    return;
+  }
+
+  console.log(`🔍 Looking for stored data for prefix: ${idPrefix}`);
+  const storedData = getStoredCSVData(idPrefix);
+
+  if (storedData && storedData.length > 0) {
+    console.log(`✅ Found stored CSV data for ${idPrefix}, loading...`);
+    csvPatientData = storedData;
+    updateCSVButton(idPrefix, storedData.length, true);
+
+    // Auto-match with stored data
+    const matchResults = matchCSVToTablePatients(csvPatientData);
+    displayMatchResults(matchResults);
+
+    console.log(
+      `🔄 Auto-loaded stored CSV data for ${idPrefix} and performed matching`
+    );
+
+    // Update download count after matching
+    setTimeout(updateDownloadCount, 100);
+  } else {
+    console.log(`❌ No stored CSV data found for prefix: ${idPrefix}`);
+  }
+}
+
+function updateCSVButton(idPrefix, patientCount, isStored) {
+  const csvLabel = document.querySelector('label[for="csv-upload"]');
+  if (!csvLabel) return;
+
+  if (isStored) {
+    // Show that we're using stored data with X button
+    csvLabel.innerHTML = `📱 Using ID ${idPrefix} (${patientCount} patients) <span id="clear-csv-data" style="
+  margin-left: 8px;
+  background: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: pointer;
+  font-weight: bold;
+" title="Clear stored CSV data">✕</span>`;
+    csvLabel.style.background = "#17a2b8"; // Blue color for stored data
+    csvLabel.style.borderColor = "#17a2b8";
+    csvLabel.title = `Using stored CSV data for ID prefix ${idPrefix} with ${patientCount} patients. Click to replace with new CSV.`;
+
+    // Add click handler for the X button
+    setTimeout(() => {
+      const clearButton = document.getElementById("clear-csv-data");
+      if (clearButton) {
+        clearButton.onclick = function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Clear the stored data
+          clearStoredCSVData(idPrefix);
+
+          // Reset the interface
+          csvPatientData = [];
+          updateCSVButton("", 0, false);
+
+          // Clear the ID prefix
+          const idPrefixInput = document.getElementById("id-prefix");
+          if (idPrefixInput) {
+            idPrefixInput.value = "";
+          }
+
+          // Update export count
+          updateExportCount();
+
+          console.log(`🗑️ Cleared stored CSV data and reset interface`);
+        };
+      }
+    }, 10);
+  } else {
+    // Reset to default
+    csvLabel.innerHTML = "📁 Choose CSV File";
+    csvLabel.style.background = "#28a745"; // Green color for new upload
+    csvLabel.style.borderColor = "#28a745";
+    csvLabel.title = "Click to upload a new CSV file";
+  }
+}
+
 function autoDetectIdPrefix(csvPatients) {
-  if (csvPatients.length === 0) return;
+  if (csvPatients.length === 0) return null;
 
   // Find the most common 5-character prefix from all IDs
   const prefixCounts = {};
@@ -1241,12 +1811,13 @@ function autoDetectIdPrefix(csvPatients) {
     const idPrefixInput = document.getElementById("id-prefix");
     if (idPrefixInput) {
       idPrefixInput.value = mostCommonPrefix;
-      idPrefixInput.style.backgroundColor = "#d4edda"; // Green background to show auto-filled
       console.log(
         `✅ Auto-detected ID prefix: ${mostCommonPrefix} (${maxCount}/${csvPatients.length} patients)`
       );
     }
+    return mostCommonPrefix;
   }
+  return null;
 }
 
 async function handleCSVUpload(event) {
@@ -1279,11 +1850,20 @@ async function handleCSVUpload(event) {
     }
 
     // Auto-detect and set ID prefix from CSV data
-    autoDetectIdPrefix(csvPatientData);
+    const detectedPrefix = autoDetectIdPrefix(csvPatientData);
+
+    // Store CSV data in localStorage with the detected prefix
+    if (detectedPrefix) {
+      storeCSVData(detectedPrefix, csvPatientData);
+      updateCSVButton(detectedPrefix, csvPatientData.length, false); // false = newly uploaded, not stored
+    }
 
     // Perform matching
     const matchResults = matchCSVToTablePatients(csvPatientData);
     displayMatchResults(matchResults);
+
+    // Update download count after matching
+    setTimeout(updateDownloadCount, 100);
   } catch (error) {
     console.error("CSV upload error:", error);
     alert("Error reading CSV file: " + error.message);
@@ -1468,14 +2048,18 @@ function matchCSVToTablePatients(csvPatients) {
 
     // Skip if we've already processed a patient with this name
     if (processedTablePatients.has(tableName)) {
-      console.log(`⏭️ SKIPPING DUPLICATE: "${tablePatient.name}" (already processed)`);
+      console.log(
+        `⏭️ SKIPPING DUPLICATE: "${tablePatient.name}" (already processed)`
+      );
       return;
     }
 
     // Mark this patient name as processed
     processedTablePatients.add(tableName);
 
-    console.log(`🔍 Processing table patient: "${tablePatient.name}" → normalized: "${tableName}"`);
+    console.log(
+      `🔍 Processing table patient: "${tablePatient.name}" → normalized: "${tableName}"`
+    );
     let bestMatch = null;
     let bestScore = 0;
 
@@ -1493,8 +2077,15 @@ function matchCSVToTablePatients(csvPatients) {
         return; // Skip already used CSV patients for partial matches only
       }
 
-      if (score > 0.5) { // Log potential matches
-        console.log(`  📋 CSV "${csvPatient.name}" → normalized: "${csvName}" → score: ${score.toFixed(3)} ${isAlreadyUsed ? '(reused for exact match)' : ''}`);
+      if (score > 0.5) {
+        // Log potential matches
+        console.log(
+          `  📋 CSV "${
+            csvPatient.name
+          }" → normalized: "${csvName}" → score: ${score.toFixed(3)} ${
+            isAlreadyUsed ? "(reused for exact match)" : ""
+          }`
+        );
       }
 
       if (score > bestScore) {
@@ -1505,7 +2096,11 @@ function matchCSVToTablePatients(csvPatients) {
 
     if (bestMatch && bestScore >= 0.666) {
       // 66.6% similarity threshold
-      console.log(`✅ MATCH FOUND: "${tablePatient.name}" ↔ "${bestMatch.patient.name}" (score: ${bestScore.toFixed(3)})`);
+      console.log(
+        `✅ MATCH FOUND: "${tablePatient.name}" ↔ "${
+          bestMatch.patient.name
+        }" (score: ${bestScore.toFixed(3)})`
+      );
       // Mark this CSV patient as used
       usedCSVPatients.add(bestMatch.index);
 
@@ -1530,7 +2125,13 @@ function matchCSVToTablePatients(csvPatients) {
           bestScore >= 0.95 ? "exact" : bestScore >= 0.85 ? "good" : "partial",
       });
     } else {
-      console.log(`❌ NO MATCH: "${tablePatient.name}" (best score: ${bestScore.toFixed(3)} with "${bestMatch?.patient?.name || 'none'}" - below threshold 0.666)`);
+      console.log(
+        `❌ NO MATCH: "${tablePatient.name}" (best score: ${bestScore.toFixed(
+          3
+        )} with "${
+          bestMatch?.patient?.name || "none"
+        }" - below threshold 0.666)`
+      );
       unmatched.push({
         tablePatient: tablePatient,
         bestMatch: bestMatch?.patient,
@@ -1673,7 +2274,10 @@ function displayMatchResults(results) {
       console.log(`🔍 Searching for text inputs in table row...`);
       const row = match.tablePatient.row;
       const rowInputs = row.querySelectorAll('input[type="text"]');
-      console.log(`Found ${rowInputs.length} text inputs in row:`, Array.from(rowInputs).map(input => input.id || 'no-id'));
+      console.log(
+        `Found ${rowInputs.length} text inputs in row:`,
+        Array.from(rowInputs).map((input) => input.id || "no-id")
+      );
       if (rowInputs.length > 0) {
         patientInput = rowInputs[0]; // Take the first text input in the row
         console.log(`✓ Found input in same row: ${patientInput.id || "no-id"}`);
@@ -1719,11 +2323,12 @@ function displayMatchResults(results) {
           ? "#fff3cd"
           : "#f8d7da";
       autoFilled++;
-      const matchTypeLog = match.matchQuality === "exact"
-        ? "✅ EXACT MATCH"
-        : match.matchQuality === "good"
-        ? "🔶 GOOD MATCH (partial)"
-        : "⚠️ FAIR MATCH (partial)";
+      const matchTypeLog =
+        match.matchQuality === "exact"
+          ? "✅ EXACT MATCH"
+          : match.matchQuality === "good"
+          ? "🔶 GOOD MATCH (partial)"
+          : "⚠️ FAIR MATCH (partial)";
 
       console.log(
         `${matchTypeLog}: Table "${match.tablePatient.name}" ↔ CSV "${match.csvPatient.name}" (ID: ${match.csvPatient.fullId}) → filled ${match.idSuffix}`
@@ -1735,29 +2340,20 @@ function displayMatchResults(results) {
         const matchIndicator = document.createElement("div");
         matchIndicator.className = "csv-match";
         matchIndicator.style.cssText = `
-          font-size: 11px;
-          color: #666;
-          font-style: italic;
-          margin-top: 2px;
-        `;
-        const csvInfo = match.matchQuality === "exact"
-          ? `(CSV: ${match.csvPatient.name})`
-          : `(CSV: ${match.csvPatient.name} | ID: ${match.csvPatient.fullId})`;
+      font-size: 11px;
+      color: #666;
+      font-style: italic;
+      margin-top: 2px;
+    `;
+        const csvInfo =
+          match.matchQuality === "exact"
+            ? `(CSV: ${match.csvPatient.name})`
+            : `(CSV: ${match.csvPatient.name} | ID: ${match.csvPatient.fullId})`;
         matchIndicator.textContent = csvInfo;
         nameCell.appendChild(matchIndicator);
       }
 
-      // Auto-trigger batch processing for matched patients
-      const batchButton = findBatchButtonForInput(patientInput);
-      if (batchButton) {
-        console.log(
-          `🔄 Auto-triggering batch processing for ${match.tablePatient.name}`
-        );
-        // Simulate clicking the batch button
-        setTimeout(() => {
-          batchButton.click();
-        }, 500 * autoFilled); // Stagger the clicks to avoid overwhelming
-      }
+      // Auto-trigger batch processing disabled - user will manually trigger via "Download All" button
     } else {
       console.error(`❌ Input not found for link: ${linkId}`);
       // List all available patient text inputs for debugging
