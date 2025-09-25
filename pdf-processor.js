@@ -325,8 +325,9 @@ class PDFProcessor {
   }
 
   generateCSVFromExtractedData(extractedDataArray, idPrefix = '') {
-    const headers = ["ID", "Name", "Test name", "Test value"];
+    const headers = ["RequestID", "ProcDate", "AnCode", "StringValue"];
     const csvRows = [headers.join(",")];
+    const procDate = this.formatProcDate(new Date());
 
     extractedDataArray.forEach((data) => {
       // Get patient name from PDF or table data
@@ -343,26 +344,24 @@ class PDFProcessor {
 
       // Extract all test results
       if (data.structuredData?.testResults) {
-        Object.entries(data.structuredData.testResults).forEach(
-          ([testName, testData]) => {
-            const row = [
-              this.escapeCsvValue(fullId),
-              this.escapeCsvValue(patientName),
-              this.escapeCsvValue(testName),
-              this.escapeCsvValue(testData.value || ""),
-            ];
-            csvRows.push(row.join(","));
-          }
-        );
-      } else {
-        // Fallback if no tests extracted
-        const row = [
-          this.escapeCsvValue(fullId),
-          this.escapeCsvValue(patientName),
-          "No tests extracted",
-          "",
-        ];
-        csvRows.push(row.join(","));
+        const seenKeys = new Set();
+        Object.entries(data.structuredData.testResults).forEach(([testName, testData]) => {
+          const mappedKey = this.mapTestNameToKey(testName);
+          // Only include mapped target keys and avoid duplicates per patient
+          if (!mappedKey) return;
+          if (seenKeys.has(mappedKey)) return;
+          seenKeys.add(mappedKey);
+
+          const requestId = `${fullId}-${patientName}`;
+          const row = [
+            this.escapeCsvValue(requestId),
+            this.escapeCsvValue(procDate),
+            this.escapeCsvValue(mappedKey),
+            this.escapeCsvValue(testData.value || ""),
+          ];
+          csvRows.push(row.join(","));
+        });
+
       }
     });
 
@@ -377,6 +376,49 @@ class PDFProcessor {
     }
     return value;
   }
+
+  // Format date as M/D/YYYY HH:mm:ss with zero-padded time
+  formatProcDate(date) {
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const m = date.getMonth() + 1; // 1-12 (no zero pad per example)
+    const d = date.getDate();      // 1-31 (no zero pad per example)
+    const yyyy = date.getFullYear();
+    const hh = pad2(date.getHours());
+    const mm = pad2(date.getMinutes());
+    const ss = pad2(date.getSeconds());
+    return `${m}/${d}/${yyyy} ${hh}:${mm}:${ss}`;
+  }
+
+  // Map raw test labels to target keys required for final docs
+  // Target keys: B12, 25OHD, TSH, FT4, ATPO, HBA1C, FERITINA, IRON, PSA, VSH, HOMOCYSTEIN, TSB, CRP
+  mapTestNameToKey(rawName) {
+    const name = String(rawName || '').trim();
+    if (!name) return null;
+
+    // Common Romanian/English variants mapped to your exact keys
+    const TEST_KEY_MAP = [
+      { key: 'B12',          re: /\b(vitamina\s*b\s*12|vitamina\s*b12|b12|cobalamin)\b/i },
+      { key: '25OHD',        re: /\b(25\s*[-\s\(]?oh[)\s]*\s*vitamina\s*d|25\s*[-\s]?oh\s*vitamin\s*d|vitamin\s*d.*25\s*[-\s]?oh|25[-\s]?hydroxy.*vitamin\s*d|25ohd)\b/i },
+      { key: 'TSH',          re: /\b(tsh|thyroid\s*stimulating\s*hormone)\b/i },
+      { key: 'FT4',          re: /\b(ft4|free\s*t4|thyroxine\s*liber[ăa]?|t4\s*liber)\b/i },
+      { key: 'ATPO',         re: /\b(anti[-\s]?tpo|anti[-\s]?tiroidperoxidaz[ăa]|anti[-\s]?thyroid[-\s]?peroxidase|tpo\s*ab|tpoab)\b/i },
+      { key: 'HBA1C',        re: /\b(hba1c|hemoglobin[ăa]?\s*glicozilat[ăa]?|hemoglobina\s*glicozilat[ăa]?|glycated\s*ha?emoglobin|a1c)\b/i },
+      { key: 'FERITINA',     re: /\b(feritin[ăa]?|ferritin)\b/i },
+      { key: 'IRON',         re: /\b(sideremie|serum\s*iron|\bfe\b|iron)\b/i },
+      { key: 'PSA',          re: /\b(psa|prostate[-\s]?specific\s*antigen)\b/i },
+      { key: 'VSH',          re: /\b(vsh|viteza\s*de\s*sedimentare|esr|sed[-\s]?rate)\b/i },
+      { key: 'HOMOCYSTEIN',  re: /\b(homocistein[ăa]?|homocystein[e]?|hcy)\b/i },
+      { key: 'TSB',          re: /\b(bilirubin[ăa]?\s*total[ăa]?|total\s*bilirubin|tsb)\b/i },
+      { key: 'CRP',          re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?|crp|hs[-\s]?crp|c[-\s]?reactive\s*protein)\b/i },
+    ];
+
+    for (const { key, re } of TEST_KEY_MAP) {
+      if (re.test(name)) return key;
+    }
+    return null;
+  }
+
+  // Removed code ID mapping per request; AnCode uses canonical key
 }
 
 // Export for use in content script

@@ -639,10 +639,59 @@ function updateTestResultsColumn(elementIndex, extractedData) {
   // Create summary of tests with values
   let testsHtml = `<div style="color: #28a745; font-weight: bold;">${testCount} test(s) found:</div>`;
 
+  const knownItems = [];
+  const otherItems = [];
+
   Object.entries(testResults).forEach(([testName, testData]) => {
     const value = testData.value || 'N/A';
-    testsHtml += `<div style="margin: 2px 0;">• ${testName}: <strong>${value}</strong></div>`;
+    let mapped = null;
+    try {
+      if (pdfProcessor && typeof pdfProcessor.mapTestNameToKey === 'function') {
+        mapped = pdfProcessor.mapTestNameToKey(testName);
+      }
+    } catch (e) {}
+
+    if (mapped) {
+      knownItems.push({ key: mapped, value });
+    } else {
+      otherItems.push(`${testName}: ${value}`);
+    }
   });
+
+  // Sort known mapped items in a consistent order
+  const ORDER = ['B12','25OHD','TSH','FT4','ATPO','HBA1C','FERITINA','IRON','PSA','VSH','HOMOCYSTEIN','TSB','CRP'];
+  // Nice display labels for table
+  const DISPLAY = {
+    B12: 'Vitamina B12',
+    '25OHD': '25-OH Vitamina D',
+    TSH: 'TSH',
+    FT4: 'FT4',
+    ATPO: 'Anti-TPO (Anti-tiroidperoxidaza)',
+    HBA1C: 'Hemoglobina glicozilata (HbA1c)',
+    FERITINA: 'Feritina',
+    IRON: 'Sideremie',
+    PSA: 'PSA',
+    VSH: 'VSH',
+    HOMOCYSTEIN: 'Homocisteina',
+    TSB: 'Bilirubina totală',
+    CRP: 'CRP (Proteina C reactivă)'
+  };
+  knownItems.sort((a, b) => {
+    const ai = ORDER.indexOf(a.key);
+    const bi = ORDER.indexOf(b.key);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  // Render known mapped items with nice names
+  knownItems.forEach(({ key, value }) => {
+    const label = DISPLAY[key] || key;
+    testsHtml += `<div style="margin: 2px 0;">• ${label}: <strong>${value}</strong></div>`;
+  });
+
+  // Visual-only summary for unmapped tests
+  if (otherItems.length > 0) {
+    testsHtml += `<div style="margin: 4px 0; color: #555;">Other tests: ${otherItems.join('; ')}</div>`;
+  }
 
   testResultCell.innerHTML = testsHtml;
   testResultCell.style.color = '#000';
