@@ -6,7 +6,7 @@ let batchQueue = []; // Store batch items locally
 
 // Wait for page to load and inject batch buttons
 // Only initialize if not being loaded remotely or if explicitly triggered
-if (typeof window.REMOTE_LOADING === 'undefined') {
+if (typeof window.REMOTE_LOADING === "undefined") {
   document.addEventListener("DOMContentLoaded", initializeBatchExtension);
 
   // Also run immediately in case DOM is already loaded
@@ -1040,18 +1040,8 @@ function updateTestResultsColumn(elementIndex, extractedData) {
   }
 
   const testResults = extractedData.structuredData?.testResults || {};
-  const testCount = Object.keys(testResults).length;
 
-  if (testCount === 0) {
-    testResultCell.innerHTML = `
-  <span style="color: #ffc107;">⚠️ No tests found</span>
-`;
-    return;
-  }
-
-  // Create summary of tests with values
-  let testsHtml = `<div style="color: #28a745; font-weight: bold;">${testCount} test(s) found:</div>`;
-
+  // Separate tests into mapped (will be exported) and unmapped (won't be exported)
   const knownItems = [];
   const otherItems = [];
 
@@ -1070,6 +1060,21 @@ function updateTestResultsColumn(elementIndex, extractedData) {
       otherItems.push(`${testName}: ${value}`);
     }
   });
+
+  // Count only mapped tests (tests that will actually be exported)
+  const mappedTestCount = knownItems.length;
+
+  if (mappedTestCount === 0 && otherItems.length === 0) {
+    testResultCell.innerHTML = `
+  <span style="color: #ffc107;">⚠️ No tests found</span>
+`;
+    return;
+  }
+
+  // Show count of mapped tests only (tests that will be exported to CSV)
+  let testsHtml = mappedTestCount > 0
+    ? `<div style="color: #28a745; font-weight: bold;">${mappedTestCount} test(s) found:</div>`
+    : `<div style="color: #ff9800; font-weight: bold;">⚠️ No exportable tests found</div>`;
 
   // Sort known mapped items in a consistent order
   const ORDER = [
@@ -1132,7 +1137,7 @@ function updateTestResultsColumn(elementIndex, extractedData) {
 
   testResultCell.innerHTML = testsHtml;
   testResultCell.style.color = "#000";
-  testResultCell.title = `Full test results for this patient (${testCount} tests).`;
+  testResultCell.title = `Full test results for this patient (${mappedTestCount} mapped, ${otherItems.length} unmapped).`;
 }
 
 async function downloadAndProcessPDF(downloadLink, batchItem) {
@@ -1532,7 +1537,20 @@ async function exportData() {
   // Generate dynamic filename: PREFIX_DD_MMM_Sante.txt
   const now = new Date();
   const day = now.getDate();
-  const monthNames = ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sep", "oct", "nov", "dec"];
+  const monthNames = [
+    "ian",
+    "feb",
+    "mar",
+    "apr",
+    "mai",
+    "iun",
+    "iul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec",
+  ];
   const month = monthNames[now.getMonth()];
   const filename = `${idPrefix}_${day}_${month}_Sante.txt`;
 
@@ -1550,6 +1568,29 @@ async function exportData() {
       "Generated CSV content (first 500 chars):",
       csvContent.substring(0, 500)
     );
+
+    // Validate export completeness
+    const validationIssues = pdfProcessor.validateExportCompleteness(
+      includedData,
+      csvContent
+    );
+    if (validationIssues.length > 0) {
+      console.warn(
+        `⚠️ Export validation found ${validationIssues.length} patient(s) with missing data:`,
+        validationIssues
+      );
+      validationIssues.forEach((issue) => {
+        showExportWarningToast(
+          `⚠️ Could not export data for: ${issue.patient}`,
+          `Extracted ${issue.extractedTests} tests but 0 rows exported (tests not mapped to known keys)`,
+          true
+        );
+      });
+    } else {
+      console.log(
+        `✅ Export validation passed: All ${includedData.length} patients exported successfully`
+      );
+    }
   } else {
     console.log("Using fallback CSV generation");
     // Fallback to simple CSV
@@ -1563,7 +1604,10 @@ async function exportData() {
   await storeFileForUpload(csvContent, filename);
 
   // Open teamm.work in new tab for auto-upload
-  window.open('https://teamm.work/admin/guests/intake-values-import-dumbrava', '_blank');
+  window.open(
+    "https://teamm.work/admin/guests/intake-values-import-dumbrava",
+    "_blank"
+  );
 
   console.log(
     `✅ Exported ${includedData.length} items (${
@@ -2446,9 +2490,42 @@ async function storeFileForUpload(content, filename) {
     content,
     filename,
     timestamp: Date.now(),
-    expiresAt: Date.now() + (5 * 60 * 1000) // 5 minutes expiry
+    expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes expiry
   };
 
   await chrome.storage.local.set({ pendingUpload: data });
-  console.log('💾 File stored for upload to teamm.work:', filename);
+  console.log("💾 File stored for upload to teamm.work:", filename);
+}
+
+// Show warning toast for export validation issues
+function showExportWarningToast(title, message, persistent = false) {
+  const toast = document.createElement("div");
+  toast.style.cssText = `
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: #ff9800;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 5px;
+    z-index: 10001;
+    max-width: 400px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    font-size: 13px;
+    animation: slideIn 0.3s ease-out;
+  `;
+  toast.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
+    <div style="font-size: 12px;">${message}</div>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Auto-remove after 8 seconds
+  setTimeout(() => {
+    if (persistent) return;
+    toast.style.transition = "opacity 0.3s";
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 300);
+  }, 8000);
 }

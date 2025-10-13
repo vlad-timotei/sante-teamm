@@ -218,6 +218,12 @@ class PDFProcessor {
         // Clean the value by removing < > symbols and extra spaces
         const cleanValue = rawValue.replace(/[<>]/g, '').trim();
 
+        // Validate value before adding to results
+        if (!this.isValidTestValue(cleanValue)) {
+          console.log(`❌ Rejected invalid value for ${test.name}: "${cleanValue}"`);
+          continue;
+        }
+
         structuredData.testResults[test.name] = {
           value: cleanValue,
         };
@@ -334,6 +340,19 @@ class PDFProcessor {
       .trim();
   }
 
+  isValidTestValue(value) {
+    if (!value || value.length === 0) return false;
+    if (value.length > 50) return false; // Too long to be a test value
+
+    // Reject single digit values that look like "1" from "1 test found"
+    if (/^[0-9]$/.test(value.trim())) return false;
+
+    // Must contain at least one digit (test values are numeric)
+    if (!/[0-9]/.test(value)) return false;
+
+    return true;
+  }
+
   generateCSVFromExtractedData(extractedDataArray, idPrefix = '') {
     const headers = ["RequestID", "ProcDate", "AnCode", "StringValue"];
     const csvRows = [headers.join(",")];
@@ -433,6 +452,40 @@ class PDFProcessor {
   }
 
   // Removed code ID mapping per request; AnCode uses canonical key
+
+  validateExportCompleteness(extractedDataArray, generatedCSV) {
+    // Returns array of patients with missing data
+    const issues = [];
+
+    extractedDataArray.forEach((data) => {
+      const patientName = data.structuredData?.patientInfo?.name ||
+                         data.patientInfo?.nume || "Unknown";
+      const testResults = data.structuredData?.testResults || {};
+
+      // Count only MAPPED tests (tests that should be exported)
+      const mappedTestCount = Object.keys(testResults).filter(testName => {
+        return this.mapTestNameToKey(testName) !== null;
+      }).length;
+
+      const patientText = data.patientInfo?.patientText || '';
+
+      // Count how many rows for this patient in CSV
+      const csvRows = generatedCSV.split('\n').filter(row =>
+        row.includes(patientText) && row.includes(patientName)
+      ).length;
+
+      // Only warn if patient has MAPPED tests that are missing from export
+      if (mappedTestCount > 0 && csvRows === 0) {
+        issues.push({
+          patient: patientName,
+          extractedTests: mappedTestCount,
+          exportedRows: csvRows
+        });
+      }
+    });
+
+    return issues;
+  }
 }
 
 // Export for use in content script
