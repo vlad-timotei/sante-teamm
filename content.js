@@ -33,6 +33,12 @@ async function initializeBatchExtension() {
   pdfProcessor = new PDFProcessor();
   await pdfProcessor.loadPDFJS();
 
+  // Hide the Charisma footer
+  hideCharismaFooter();
+
+  // Make filter form collapsible
+  makeFiltersCollapsible();
+
   // Add test results column to table
   addTestResultsColumn();
 
@@ -54,6 +60,160 @@ async function initializeBatchExtension() {
       tryLoadAnyStoredData();
     }, 500);
   }
+}
+
+function hideCharismaFooter() {
+  // Find and hide the Charisma footer
+  const footerDivs = document.querySelectorAll(
+    'div[style*="position: fixed"][style*="bottom: 0"]'
+  );
+  footerDivs.forEach((div) => {
+    const link = div.querySelector('a[href*="charisma"]');
+    if (link && link.textContent.includes("Charisma Medical Software")) {
+      div.style.display = "none";
+      console.log("✅ Hidden Charisma footer");
+    }
+  });
+}
+
+function makeFiltersCollapsible() {
+  // Find all form-group rows (the 3 rows with filter inputs)
+  const formGroups = document.querySelectorAll(
+    ".form-horizontal .row.form-group"
+  );
+
+  if (formGroups.length === 0) {
+    console.warn("⚠️ No form-group rows found");
+    return;
+  }
+
+  // Find and hide all <hr> separator rows within form-horizontal
+  const formHorizontal = document.querySelector(".form-horizontal");
+  if (formHorizontal) {
+    const hrRows = formHorizontal.querySelectorAll(".row");
+    hrRows.forEach((row) => {
+      const hr = row.querySelector("hr");
+      if (hr) {
+        row.style.display = "none";
+      }
+    });
+  }
+
+  // Hide the complex results label
+  const complexResultsLabel = document.getElementById(
+    "ctl00_contentMain_lblComplexResults"
+  );
+  if (complexResultsLabel) {
+    complexResultsLabel.style.display = "none";
+  }
+
+  // Update logo container padding and image URL
+  const logoContainer = document.querySelector(
+    'div[style*="padding-bottom: 5%"]'
+  );
+  if (logoContainer) {
+    const logoImage = logoContainer.querySelector('img[src*="Sigla.png"]');
+    if (logoImage) {
+      logoContainer.style.paddingBottom = "20px";
+
+      // Set image dimensions - height 100px, auto width
+      logoImage.style.height = "100px";
+      logoImage.style.width = "auto";
+
+      // Change logo image URL - UPDATE THIS URL WITH YOUR CUSTOM LOGO
+      const customLogoUrl = "https://i.ibb.co/whDSh2sm/logo-sante-teamm2.jpg";
+      if (customLogoUrl !== "PLACEHOLDER_LOGO_URL_HERE") {
+        logoImage.src = customLogoUrl;
+      }
+    }
+  }
+
+  // Create wrapper for collapsible content
+  const collapseWrapper = document.createElement("div");
+  collapseWrapper.id = "filter-collapse-wrapper";
+  collapseWrapper.style.cssText = `
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    width: 100%;
+    padding: 0 15px;
+    box-sizing: border-box;
+  `;
+
+  // Create toggle button
+  const toggleButton = document.createElement("input");
+  toggleButton.type = "submit";
+  toggleButton.id = "filter-toggle-btn";
+  toggleButton.value = "▼ Filtre";
+  toggleButton.className = "btn btn-default col-filtersmr";
+  toggleButton.tabIndex = 8;
+  toggleButton.style.float = "right";
+  toggleButton.style.margin = "5px 0 10px";
+
+  // Toggle function
+  let isExpanded = false;
+  toggleButton.onclick = (e) => {
+    e.preventDefault();
+    isExpanded = !isExpanded;
+    if (isExpanded) {
+      collapseWrapper.style.maxHeight = collapseWrapper.scrollHeight + "px";
+      toggleButton.value = "▲ Filtre";
+    } else {
+      collapseWrapper.style.maxHeight = "0";
+      toggleButton.value = "▼ Filtre";
+    }
+  };
+
+  // Find the quick filter buttons container and append toggle button there
+  const quickFilterButtons = document.querySelector(
+    '.form-horizontal div > input[id*="btnFilter"]'
+  );
+  if (quickFilterButtons && quickFilterButtons.parentElement) {
+    quickFilterButtons.parentElement.appendChild(toggleButton);
+  }
+
+  // Move all form-group rows into the collapse wrapper
+  formGroups.forEach((group) => {
+    collapseWrapper.appendChild(group);
+  });
+
+  // Insert collapse wrapper before the first form-group's original position
+  const firstFormGroup = formGroups[0];
+  if (firstFormGroup.parentNode) {
+    // Find the parent and insert the wrapper where form groups used to be
+    const parent = formHorizontal || firstFormGroup.parentNode.parentNode;
+    if (parent) {
+      // Insert after the quick filter row
+      const quickFilterRow = document.querySelector(
+        '.form-horizontal .row:has(input[id*="btnFilter"])'
+      );
+      if (quickFilterRow && quickFilterRow.nextSibling) {
+        parent.insertBefore(collapseWrapper, quickFilterRow.nextSibling);
+      } else {
+        parent.appendChild(collapseWrapper);
+      }
+    }
+  }
+
+  // Check if any filter input has a value - if so, expand by default
+  const hasFilledInputs = Array.from(
+    collapseWrapper.querySelectorAll('input[type="text"], select')
+  ).some((input) => {
+    if (input.tagName === "SELECT") {
+      return input.value && input.value !== "-1" && input.value !== "";
+    }
+    return input.value && input.value.trim() !== "";
+  });
+
+  if (hasFilledInputs) {
+    // Expand by default if filters are already filled
+    isExpanded = true;
+    collapseWrapper.style.maxHeight = collapseWrapper.scrollHeight + "px";
+    toggleButton.value = "▲ Hide Filters";
+    console.log("✅ Filters expanded by default (inputs have values)");
+  }
+
+  console.log("✅ Made filters collapsible");
 }
 
 async function syncUIWithLocalStorage() {
@@ -98,12 +258,16 @@ async function syncUIWithLocalStorage() {
     if (idPrefix) {
       const patientKey = getPatientKey(idPrefix, patientName);
       storedPatient = queue.find(
-        (p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
+        (p) =>
+          getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) ===
+          patientKey
       );
     } else {
       // Fallback: match by name only (for when idPrefix not set yet)
       storedPatient = queue.find(
-        (p) => p.patientInfo?.nume?.trim().toLowerCase() === patientName.toLowerCase()
+        (p) =>
+          p.patientInfo?.nume?.trim().toLowerCase() ===
+          patientName.toLowerCase()
       );
     }
 
@@ -452,11 +616,8 @@ function createSingleProcessButton() {
   // Create compact button container
   const buttonContainer = document.createElement("div");
   buttonContainer.style.cssText = `
-margin: 10px 0;
-padding: 8px 12px;
-background: #f8f9fa;
-border: 1px solid #dee2e6;
-border-radius: 4px;
+margin: 0px 0;
+padding: 0px 12px;
   `;
 
   buttonContainer.innerHTML = `
@@ -625,7 +786,8 @@ async function addToBatch(element, index, batchBtn) {
   // Load localStorage to check if patient already exists
   const queue = await loadQueueFromStorage();
   const existingPatient = queue.find(
-    (p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
+    (p) =>
+      getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
   );
 
   // Restore row styling
@@ -856,7 +1018,8 @@ async function removeFromBatch(element, index, batchBtn) {
   // Load localStorage and mark patient as excluded
   const queue = await loadQueueFromStorage();
   const patient = queue.find(
-    (p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
+    (p) =>
+      getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
   );
 
   if (patient) {
@@ -874,7 +1037,9 @@ async function removeFromBatch(element, index, batchBtn) {
 
   // Mark extracted data as excluded (for current page state)
   const extractedItem = extractedData.find(
-    (item) => getPatientKey(item.patientInfo?.idPrefix, item.patientInfo?.nume) === patientKey
+    (item) =>
+      getPatientKey(item.patientInfo?.idPrefix, item.patientInfo?.nume) ===
+      patientKey
   );
 
   if (extractedItem) {
@@ -1143,7 +1308,9 @@ async function updateExportCount() {
   // Load from localStorage (not current page's extractedData)
   const queue = await loadQueueFromStorage();
   // Count only patients that are not excluded AND not exported yet
-  const exportCount = queue.filter((p) => p.excluded === false && p.exported === false).length;
+  const exportCount = queue.filter(
+    (p) => p.excluded === false && p.exported === false
+  ).length;
 
   const countElement = document.getElementById("exported-count");
   const exportButton = document.getElementById("sante-process-export");
@@ -1193,7 +1360,9 @@ async function updateDownloadCount() {
   // Load existing queue
   const queue = await loadQueueFromStorage();
   const existingKeys = new Set(
-    queue.map((p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume))
+    queue.map((p) =>
+      getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume)
+    )
   );
 
   // Count how many patients have ID suffixes filled in AND have ready status AND are NOT in localStorage
@@ -1263,7 +1432,9 @@ async function analyzeCurrentPage() {
   // Load existing queue to check for duplicates
   const queue = await loadQueueFromStorage();
   const existingKeys = new Set(
-    queue.map((p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume))
+    queue.map((p) =>
+      getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume)
+    )
   );
 
   // Find all patients with filled ID suffixes
@@ -1433,7 +1604,9 @@ function displayTestResults(testResultCell, extractedData) {
   }
 
   if (extractedData.error) {
-    testResultCell.innerHTML = exportedBadge + `
+    testResultCell.innerHTML =
+      exportedBadge +
+      `
   <span style="color: #dc3545;">❌ Error: ${extractedData.error}</span>
 `;
     return;
@@ -1948,19 +2121,27 @@ async function exportData() {
   console.log(`📦 Total patients in localStorage: ${allPatients.length}`);
 
   // Filter non-excluded AND non-exported patients
-  const patientsToExport = allPatients.filter((p) => p.excluded === false && p.exported === false);
+  const patientsToExport = allPatients.filter(
+    (p) => p.excluded === false && p.exported === false
+  );
   console.log(
     `📊 Patients to export (non-excluded, not exported): ${patientsToExport.length}`
   );
   console.log(
-    `🚫 Excluded patients: ${allPatients.filter(p => p.excluded === true).length}`
+    `🚫 Excluded patients: ${
+      allPatients.filter((p) => p.excluded === true).length
+    }`
   );
   console.log(
-    `✓ Already exported patients: ${allPatients.filter(p => p.exported === true).length}`
+    `✓ Already exported patients: ${
+      allPatients.filter((p) => p.exported === true).length
+    }`
   );
 
   if (patientsToExport.length === 0) {
-    showWarningToast("Nu am ce să export! Toți pacienții au fost deja exportați sau sunt excluși.");
+    showWarningToast(
+      "Nu am ce să export! Toți pacienții au fost deja exportați sau sunt excluși."
+    );
     return;
   }
 
@@ -2048,11 +2229,16 @@ async function exportData() {
   const exportTimestamp = Date.now();
   const queue = await loadQueueFromStorage();
   const exportedKeys = new Set(
-    patientsToExport.map((p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume))
+    patientsToExport.map((p) =>
+      getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume)
+    )
   );
 
   queue.forEach((patient) => {
-    const patientKey = getPatientKey(patient.patientInfo?.idPrefix, patient.patientInfo?.nume);
+    const patientKey = getPatientKey(
+      patient.patientInfo?.idPrefix,
+      patient.patientInfo?.nume
+    );
     if (exportedKeys.has(patientKey)) {
       patient.exported = true;
       patient.exportedAt = exportTimestamp;
@@ -2061,7 +2247,9 @@ async function exportData() {
 
   await saveQueueToStorage(queue);
   await updateExportCount();
-  console.log(`✅ Marked ${patientsToExport.length} patients as exported in localStorage`);
+  console.log(
+    `✅ Marked ${patientsToExport.length} patients as exported in localStorage`
+  );
 
   // Count only patients with exportable tests (mapped tests > 0)
   const patientsWithExportableData = patientsToExport.filter((patient) => {
@@ -2070,7 +2258,10 @@ async function exportData() {
 
     Object.entries(testResults).forEach(([testName, testData]) => {
       try {
-        if (pdfProcessor && typeof pdfProcessor.mapTestNameToKey === "function") {
+        if (
+          pdfProcessor &&
+          typeof pdfProcessor.mapTestNameToKey === "function"
+        ) {
           const mapped = pdfProcessor.mapTestNameToKey(testName);
           if (mapped) mappedCount++;
         }
@@ -2084,9 +2275,14 @@ async function exportData() {
   await syncUIWithLocalStorage();
 
   // Show success message with count of patients with exportable data
-  const exportMessage = patientsWithExportableData.length === patientsToExport.length
-    ? `Exported ${patientsWithExportableData.length} patients with exportable data.`
-    : `Exported ${patientsWithExportableData.length} patients with exportable data (${patientsToExport.length - patientsWithExportableData.length} had no exportable tests).`;
+  const exportMessage =
+    patientsWithExportableData.length === patientsToExport.length
+      ? `Exported ${patientsWithExportableData.length} patients with exportable data.`
+      : `Exported ${
+          patientsWithExportableData.length
+        } patients with exportable data (${
+          patientsToExport.length - patientsWithExportableData.length
+        } had no exportable tests).`;
 
   showSuccessToast(
     "✅ Export Complete",
@@ -3030,8 +3226,8 @@ async function clearQueue() {
 async function resetExportedStatus() {
   const confirmed = confirm(
     "🔄 Reset Exported Status?\n\n" +
-    "This will mark ALL patients as NOT exported, allowing you to export them again.\n\n" +
-    "This is a DEV/DEBUG feature. Are you sure?"
+      "This will mark ALL patients as NOT exported, allowing you to export them again.\n\n" +
+      "This is a DEV/DEBUG feature. Are you sure?"
   );
 
   if (!confirmed) return;
@@ -3093,7 +3289,9 @@ async function finishBatchAnalysis() {
 
   // Remove duplicates by unique key (idPrefix + name)
   const existingKeys = new Set(
-    queue.map((p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume))
+    queue.map((p) =>
+      getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume)
+    )
   );
 
   const newPatients = currentPageAnalysis.patients.filter((p) => {
