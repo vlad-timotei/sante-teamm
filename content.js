@@ -9,7 +9,7 @@ let currentPageAnalysis = {
   isAnalyzing: false,
   patients: [],
   completed: 0,
-  total: 0
+  total: 0,
 };
 
 // Wait for page to load and inject batch buttons
@@ -119,10 +119,14 @@ async function syncUIWithLocalStorage() {
 
           // Populate test results from stored data
           displayTestResults(testResultCell, storedPatient);
-          console.log(`📊 Populated test results for ${storedPatient.patientInfo.nume}`);
+          console.log(
+            `📊 Populated test results for ${storedPatient.patientInfo.nume}`
+          );
         }
 
-        console.log(`✅ Synced UI for ${storedPatient.patientInfo.nume}: not excluded`);
+        console.log(
+          `✅ Synced UI for ${storedPatient.patientInfo.nume}: not excluded`
+        );
       } else {
         // In storage, excluded → greyed out
         batchBtn.textContent = "+";
@@ -157,7 +161,9 @@ async function syncUIWithLocalStorage() {
           }
         }
 
-        console.log(`🚫 Synced UI for ${storedPatient.patientInfo.nume}: excluded`);
+        console.log(
+          `🚫 Synced UI for ${storedPatient.patientInfo.nume}: excluded`
+        );
       }
     } else {
       // Not in storage → default "+" button
@@ -167,7 +173,9 @@ async function syncUIWithLocalStorage() {
       row.style.opacity = "1";
       row.style.backgroundColor = "";
 
-      console.log(`➕ Patient ${patientName} not in storage, showing default button`);
+      console.log(
+        `➕ Patient ${patientName} not in storage, showing default button`
+      );
     }
   });
 
@@ -217,7 +225,7 @@ function addTestResultsColumn() {
   if (headerRow) {
     // Add Batch Processing header
     const batchHeaderCell = document.createElement("th");
-    batchHeaderCell.textContent = "Export";
+    batchHeaderCell.textContent = "Acțiuni";
     batchHeaderCell.style.cssText = `
   background: #f8f9fa;
   border: 1px solid #dee2e6;
@@ -229,7 +237,7 @@ function addTestResultsColumn() {
 
     // Add Test Results header
     const testResultsHeaderCell = document.createElement("th");
-    testResultsHeaderCell.textContent = "Results";
+    testResultsHeaderCell.textContent = "Rezultate";
     testResultsHeaderCell.style.cssText = `
   background: #f8f9fa;
   border: 1px solid #dee2e6;
@@ -471,7 +479,7 @@ border-radius: 4px;
     text-align: center;
     transition: all 0.2s;
   " disabled>
-    🔍 Analyze Page (<span id="analyze-count">0</span>)
+    🔍 Analizează (<span id="analyze-count">0</span>)
   </button>
   <button type="button" id="sante-process-export" style="
     background: #6c757d;
@@ -487,7 +495,7 @@ border-radius: 4px;
     text-align: center;
     transition: all 0.2s;
   " disabled>
-    📥 Export (<span id="exported-count">0</span>)
+    📥 Import Teamm (<span id="exported-count">0</span>)
   </button>
 </div>
 <div id="analysis-progress" style="display: none; margin-top: 8px; text-align: center; font-size: 12px; color: #007cba; font-weight: bold;">
@@ -835,8 +843,7 @@ async function removeFromBatch(element, index, batchBtn) {
 
   // Mark extracted data as excluded (for current page state)
   const extractedItem = extractedData.find(
-    (item) =>
-      item.patientInfo?.nume?.trim().toLowerCase() === patientName
+    (item) => item.patientInfo?.nume?.trim().toLowerCase() === patientName
   );
 
   if (extractedItem) {
@@ -1186,7 +1193,7 @@ async function analyzeCurrentPage() {
   // Load existing queue to check for duplicates
   const queue = await loadQueueFromStorage();
   const existingNames = new Set(
-    queue.map(p => p.patientInfo?.nume?.trim().toLowerCase())
+    queue.map((p) => p.patientInfo?.nume?.trim().toLowerCase())
   );
 
   // Find all patients with filled ID suffixes
@@ -1247,11 +1254,15 @@ async function analyzeCurrentPage() {
       (input) => input.value.trim() !== ""
     ).length;
     if (totalWithIDs > 0) {
-      alert(
-        `Found ${totalWithIDs} patients with IDs, but none have "Efectuat cu rezultate" status. Only patients with ready status can be downloaded.`
+      showWarningToast(
+        "Am analizat toți pacienții cu ID-uri.",
+        "Nu sunt informații noi. Fie au statusul în prelucrare fie deja există date pentru aceștia."
       );
     } else {
-      alert("No patients with ID suffixes found!");
+      showWarningToast(
+        "Niciun pacient cu ID.",
+        "Introduceți sufixe de ID pentru pacienți înainte de analiză."
+      );
     }
     return;
   }
@@ -1265,7 +1276,7 @@ async function analyzeCurrentPage() {
     isAnalyzing: true,
     patients: [],
     completed: 0,
-    total: patientsWithIDs.length
+    total: patientsWithIDs.length,
   };
 
   // Show progress indicator
@@ -1345,9 +1356,10 @@ function displayTestResults(testResultCell, extractedData) {
   }
 
   // Show count of mapped tests only (tests that will be exported to CSV)
-  let testsHtml = mappedTestCount > 0
-    ? `<div style="color: #28a745; font-weight: bold;">${mappedTestCount} test(s) found:</div>`
-    : `<div style="color: #ff9800; font-weight: bold;">⚠️ No exportable tests found</div>`;
+  let testsHtml =
+    mappedTestCount > 0
+      ? `<div style="color: #28a745; font-weight: bold;">${mappedTestCount} analiză(e):</div>`
+      : `<div style="color: #ff9800; font-weight: bold;">⚠️ Nicio analiză.</div>`;
 
   // Sort known mapped items in a consistent order
   const ORDER = [
@@ -1803,7 +1815,7 @@ async function exportData() {
   // Check for ID prefix
   const idPrefix = document.getElementById("id-prefix")?.value.trim();
   if (!idPrefix) {
-    alert("Please enter an ID prefix (e.g., 25S19) before exporting.");
+    showWarningToast("Te rog să introduci un prefix de ID (ex: 25S19)");
     return;
   }
 
@@ -1813,13 +1825,15 @@ async function exportData() {
 
   // Filter non-excluded patients
   const patientsToExport = allPatients.filter((p) => p.excluded === false);
-  console.log(`📊 Patients to export (non-excluded): ${patientsToExport.length}`);
-  console.log(`🚫 Excluded patients: ${allPatients.length - patientsToExport.length}`);
+  console.log(
+    `📊 Patients to export (non-excluded): ${patientsToExport.length}`
+  );
+  console.log(
+    `🚫 Excluded patients: ${allPatients.length - patientsToExport.length}`
+  );
 
   if (patientsToExport.length === 0) {
-    alert(
-      "No data to export! All patients have been excluded or no data was extracted."
-    );
+    showWarningToast("Nu am ce să export! Toți pacienții sunt excluși.");
     return;
   }
 
@@ -1880,7 +1894,7 @@ async function exportData() {
         validationIssues
       );
       validationIssues.forEach((issue) => {
-        showExportWarningToast(
+        showWarningToast(
           `⚠️ Could not export data for: ${issue.patient}`,
           `Extracted ${issue.extractedTests} tests but 0 rows exported (tests not mapped to known keys)`,
           true
@@ -2112,7 +2126,7 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
 
   if (isStored) {
     // Show that we're using stored data with X button
-    csvLabel.innerHTML = `📱 Using ID ${idPrefix} (${patientCount} patients) <span id="clear-csv-data" style="
+    csvLabel.innerHTML = `Sejur ${idPrefix} (${patientCount} pacienți) <span id="clear-csv-data" style="
   margin-left: 8px;
   background: #dc3545;
   color: white;
@@ -2865,10 +2879,10 @@ async function finishBatchAnalysis() {
 
   // Remove duplicates by name
   const existingNames = new Set(
-    queue.map(p => p.patientInfo?.nume?.trim().toLowerCase())
+    queue.map((p) => p.patientInfo?.nume?.trim().toLowerCase())
   );
 
-  const newPatients = currentPageAnalysis.patients.filter(p => {
+  const newPatients = currentPageAnalysis.patients.filter((p) => {
     const name = p.patientInfo?.nume?.trim().toLowerCase();
     return !existingNames.has(name);
   });
@@ -2876,15 +2890,22 @@ async function finishBatchAnalysis() {
   const merged = [...queue, ...newPatients];
   await saveQueueToStorage(merged);
 
-  console.log(`✅ Saved ${newPatients.length} new patients to localStorage (${currentPageAnalysis.patients.length - newPatients.length} duplicates skipped)`);
+  console.log(
+    `✅ Saved ${newPatients.length} new patients to localStorage (${
+      currentPageAnalysis.patients.length - newPatients.length
+    } duplicates skipped)`
+  );
 
   // Update export count
   await updateExportCount();
 
   // Show success toast
-  const message = newPatients.length === currentPageAnalysis.patients.length
-    ? `Added ${newPatients.length} patients`
-    : `Added ${newPatients.length} patients (${currentPageAnalysis.patients.length - newPatients.length} duplicates skipped)`;
+  const message =
+    newPatients.length === currentPageAnalysis.patients.length
+      ? `Added ${newPatients.length} patients`
+      : `Added ${newPatients.length} patients (${
+          currentPageAnalysis.patients.length - newPatients.length
+        } duplicates skipped)`;
 
   showSuccessToast("✅ Analysis Complete", message);
 
@@ -2893,7 +2914,7 @@ async function finishBatchAnalysis() {
     isAnalyzing: false,
     patients: [],
     completed: 0,
-    total: 0
+    total: 0,
   };
 
   // Hide progress indicator
@@ -2901,7 +2922,7 @@ async function finishBatchAnalysis() {
 }
 
 // Show warning toast for export validation issues
-function showExportWarningToast(title, message, persistent = false) {
+function showWarningToast(title, message, persistent = false) {
   const toast = document.createElement("div");
   toast.style.cssText = `
     position: fixed;
