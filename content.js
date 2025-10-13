@@ -1183,6 +1183,12 @@ function updateDownloadCount() {
 async function analyzeCurrentPage() {
   console.log("🔄 Starting page analysis...");
 
+  // Load existing queue to check for duplicates
+  const queue = await loadQueueFromStorage();
+  const existingNames = new Set(
+    queue.map(p => p.patientInfo?.nume?.trim().toLowerCase())
+  );
+
   // Find all patients with filled ID suffixes
   const patientInputs = document.querySelectorAll('input[id^="patient-text-"]');
   const patientsWithIDs = [];
@@ -1211,6 +1217,17 @@ async function analyzeCurrentPage() {
         console.log(
           `✅ Including patient with ID suffix ${idSuffix} - status: "${statusTitle}"`
         );
+      }
+
+      // Check if patient already has data in localStorage
+      const cells = row.querySelectorAll("td");
+      const patientName = cells[1]?.textContent.trim().toLowerCase();
+
+      if (existingNames.has(patientName)) {
+        console.log(
+          `⏭️ Skipping patient ${patientName} - already has data in localStorage`
+        );
+        return;
       }
 
       // Find the corresponding batch button
