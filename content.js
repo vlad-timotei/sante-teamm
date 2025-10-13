@@ -35,6 +35,11 @@ async function initializeBatchExtension() {
     injectBatchButtons(downloadElements);
     createSingleProcessButton();
 
+    // Load and display queue indicator
+    setTimeout(() => {
+      updateQueueIndicator();
+    }, 100);
+
     // Check for stored CSV data after everything is set up
     setTimeout(() => {
       // Try to load stored data even if prefix field is empty by checking localStorage for any stored prefixes
@@ -339,6 +344,22 @@ border-radius: 4px;
   " disabled>
     📥 Download All (<span id="download-count">0</span>)
   </button>
+  <button type="button" id="sante-add-to-queue" style="
+    background: #6c757d;
+    color: white;
+    border: 2px solid #6c757d;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: not-allowed;
+    font-size: 12px;
+    font-weight: bold;
+    opacity: 0.6;
+    display: inline-block;
+    text-align: center;
+    transition: all 0.2s;
+  " disabled>
+    📦 Add to Queue (<span id="queue-add-count">0</span>)
+  </button>
   <button type="button" id="sante-process-export" style="
     background: #6c757d;
     color: white;
@@ -356,6 +377,9 @@ border-radius: 4px;
     📥 Export (<span id="exported-count">0</span>)
   </button>
 </div>
+<div id="queue-indicator" style="margin-top: 8px; text-align: center; font-size: 12px; color: #666; display: none;">
+  📦 Queue: <span id="queue-count">0</span> patient(s)
+</div>
 <div id="match-results" style="display: none;"></div>
   `;
 
@@ -364,6 +388,7 @@ border-radius: 4px;
 
   document.getElementById("sante-process-export").onclick = exportData;
   document.getElementById("sante-download-all").onclick = downloadAllWithIDs;
+  document.getElementById("sante-add-to-queue").onclick = addCurrentPageToQueue;
 
   // Auto-submit CSV when file is selected
   const csvFileInput = document.getElementById("csv-upload");
@@ -846,9 +871,15 @@ function updateExportCount() {
   const exportCount = extractedData.filter((item) => !item.excluded).length;
   const countElement = document.getElementById("exported-count");
   const exportButton = document.getElementById("sante-process-export");
+  const queueAddCountElement = document.getElementById("queue-add-count");
+  const queueAddButton = document.getElementById("sante-add-to-queue");
 
   if (countElement) {
     countElement.textContent = exportCount;
+  }
+
+  if (queueAddCountElement) {
+    queueAddCountElement.textContent = exportCount;
   }
 
   if (exportButton) {
@@ -866,6 +897,24 @@ function updateExportCount() {
       exportButton.style.borderColor = "#6c757d";
       exportButton.style.cursor = "not-allowed";
       exportButton.style.opacity = "0.6";
+    }
+  }
+
+  if (queueAddButton) {
+    if (exportCount > 0) {
+      // Enable "Add to Queue" button when results are available
+      queueAddButton.disabled = false;
+      queueAddButton.style.background = "#17a2b8";
+      queueAddButton.style.borderColor = "#17a2b8";
+      queueAddButton.style.cursor = "pointer";
+      queueAddButton.style.opacity = "1";
+    } else {
+      // Disable button when no results are available
+      queueAddButton.disabled = true;
+      queueAddButton.style.background = "#6c757d";
+      queueAddButton.style.borderColor = "#6c757d";
+      queueAddButton.style.cursor = "not-allowed";
+      queueAddButton.style.opacity = "0.6";
     }
   }
 }
@@ -1511,20 +1560,59 @@ async function exportData() {
     return;
   }
 
-  // Filter out excluded items
-  const includedData = extractedData.filter((item) => !item.excluded);
-  console.log("Items to export (excluding unchecked):", includedData.length);
-  console.log("Excluded items:", extractedData.length - includedData.length);
+  // Load queue from storage
+  const queueData = await getQueueData();
+  console.log(`📦 Queue loaded: ${queueData.length} patients`);
 
-  if (includedData.length === 0) {
+  // Filter out excluded items from current page
+  const currentPageData = extractedData.filter((item) => !item.excluded);
+  console.log("Current page items to export:", currentPageData.length);
+  console.log("Excluded items:", extractedData.length - currentPageData.length);
+
+  // Merge queue + current page data, removing duplicates by patient name
+  let allData = [...queueData];
+  const queueNames = new Set(
+    queueData.map((item) => item.patientInfo?.nume?.trim().toLowerCase())
+  );
+
+  const duplicatesFromCurrentPage = [];
+  currentPageData.forEach((patient) => {
+    const patientName = patient.patientInfo?.nume?.trim().toLowerCase();
+    if (!patientName) {
+      console.warn("⚠️ Skipping patient with no name from current page:", patient);
+      return;
+    }
+
+    if (queueNames.has(patientName)) {
+      duplicatesFromCurrentPage.push(patient.patientInfo.nume);
+      console.log(`⚠️ Duplicate found in current page: ${patient.patientInfo.nume} (already in queue)`);
+    } else {
+      allData.push(patient);
+    }
+  });
+
+  // Show warning for duplicates from current page
+  if (duplicatesFromCurrentPage.length > 0) {
+    duplicatesFromCurrentPage.forEach((name) => {
+      showExportWarningToast(
+        "⚠️ Duplicate skipped",
+        `Patient "${name}" from current page already in queue`,
+        false
+      );
+    });
+  }
+
+  console.log(`📊 Total patients for export: ${allData.length} (${queueData.length} from queue, ${currentPageData.length - duplicatesFromCurrentPage.length} from current page)`);
+
+  if (allData.length === 0) {
     alert(
-      "No data to export! All items have been unchecked or no data was extracted."
+      "No data to export! All items have been excluded or no data was extracted."
     );
     return;
   }
 
   // Check if all included patients have ID suffixes
-  const missingIds = includedData.filter(
+  const missingIds = allData.filter(
     (item) => !item.patientInfo?.patientText
   );
   if (missingIds.length > 0) {
@@ -1558,10 +1646,10 @@ async function exportData() {
 
   // Use the PDF processor to generate proper CSV with PDF content
   let csvContent;
-  if (pdfProcessor && includedData.length > 0) {
+  if (pdfProcessor && allData.length > 0) {
     console.log("Using PDF processor for CSV generation");
     csvContent = pdfProcessor.generateCSVFromExtractedData(
-      includedData,
+      allData,
       idPrefix
     );
     console.log(
@@ -1571,7 +1659,7 @@ async function exportData() {
 
     // Validate export completeness
     const validationIssues = pdfProcessor.validateExportCompleteness(
-      includedData,
+      allData,
       csvContent
     );
     if (validationIssues.length > 0) {
@@ -1588,13 +1676,13 @@ async function exportData() {
       });
     } else {
       console.log(
-        `✅ Export validation passed: All ${includedData.length} patients exported successfully`
+        `✅ Export validation passed: All ${allData.length} patients exported successfully`
       );
     }
   } else {
     console.log("Using fallback CSV generation");
     // Fallback to simple CSV
-    csvContent = convertToCSV(includedData);
+    csvContent = convertToCSV(allData);
   }
 
   // Download file locally
@@ -1603,6 +1691,18 @@ async function exportData() {
   // Store file for upload to teamm.work
   await storeFileForUpload(csvContent, filename);
 
+  // Clear the queue after successful export
+  await clearQueue();
+  await updateQueueIndicator();
+  console.log("🗑️ Queue cleared after successful export");
+
+  // Show success message with breakdown
+  const successMessage = queueData.length > 0
+    ? `Exported ${allData.length} patients total (${queueData.length} from queue, ${currentPageData.length - duplicatesFromCurrentPage.length} from current page)`
+    : `Exported ${allData.length} patients from current page`;
+
+  showSuccessToast("✅ Export Complete", successMessage);
+
   // Open teamm.work in new tab for auto-upload
   window.open(
     "https://teamm.work/admin/guests/intake-values-import-dumbrava",
@@ -1610,9 +1710,7 @@ async function exportData() {
   );
 
   console.log(
-    `✅ Exported ${includedData.length} items (${
-      extractedData.length - includedData.length
-    } excluded) - Downloaded locally AND opening teamm.work for upload`
+    `✅ Exported ${allData.length} items (${queueData.length} from queue, ${currentPageData.length - duplicatesFromCurrentPage.length} from current page) - Downloaded locally AND opening teamm.work for upload`
   );
 }
 
@@ -2497,6 +2595,137 @@ async function storeFileForUpload(content, filename) {
   console.log("💾 File stored for upload to teamm.work:", filename);
 }
 
+// Queue storage functions
+async function loadQueueFromStorage() {
+  try {
+    const result = await chrome.storage.local.get(["sante-export-queue"]);
+    const queue = result["sante-export-queue"] || [];
+    console.log(`📦 Loaded queue from storage: ${queue.length} patients`);
+    return queue;
+  } catch (error) {
+    console.error("Failed to load queue from storage:", error);
+    return [];
+  }
+}
+
+async function saveQueueToStorage(queue) {
+  try {
+    await chrome.storage.local.set({ "sante-export-queue": queue });
+    console.log(`💾 Saved queue to storage: ${queue.length} patients`);
+  } catch (error) {
+    console.error("Failed to save queue to storage:", error);
+  }
+}
+
+async function addCurrentPageToQueue() {
+  console.log("📦 Adding current page to queue...");
+
+  // Get non-excluded extracted data from current page
+  const currentPageData = extractedData.filter((item) => !item.excluded);
+
+  if (currentPageData.length === 0) {
+    alert("No patients to add to queue. Please process some patients first.");
+    return;
+  }
+
+  // Load existing queue
+  const existingQueue = await loadQueueFromStorage();
+
+  // Check for duplicates by patient name
+  const duplicates = [];
+  const newPatients = [];
+
+  currentPageData.forEach((patient) => {
+    const patientName = patient.patientInfo?.nume?.trim().toLowerCase();
+    if (!patientName) {
+      console.warn("⚠️ Skipping patient with no name:", patient);
+      return;
+    }
+
+    // Check if patient already exists in queue
+    const isDuplicate = existingQueue.some(
+      (queuedPatient) =>
+        queuedPatient.patientInfo?.nume?.trim().toLowerCase() === patientName
+    );
+
+    if (isDuplicate) {
+      duplicates.push(patient.patientInfo.nume);
+    } else {
+      newPatients.push(patient);
+    }
+  });
+
+  // Show warnings for duplicates
+  if (duplicates.length > 0) {
+    duplicates.forEach((name) => {
+      showExportWarningToast(
+        "⚠️ Duplicate patient",
+        `Patient "${name}" already in queue, skipping duplicate`,
+        false
+      );
+    });
+  }
+
+  // Add new patients to queue
+  if (newPatients.length > 0) {
+    const updatedQueue = [...existingQueue, ...newPatients];
+    await saveQueueToStorage(updatedQueue);
+
+    // Show success message
+    const successMsg =
+      duplicates.length > 0
+        ? `Added ${newPatients.length} patient(s) to queue (${duplicates.length} duplicates skipped)`
+        : `Added ${newPatients.length} patient(s) to queue`;
+
+    showSuccessToast("✅ Queue Updated", successMsg);
+
+    console.log(
+      `✅ Added ${newPatients.length} patients to queue (${duplicates.length} duplicates skipped)`
+    );
+    console.log(`📦 Total queue size: ${updatedQueue.length} patients`);
+
+    // Update queue indicator
+    updateQueueIndicator();
+  } else {
+    alert(
+      `All ${currentPageData.length} patient(s) are already in the queue. No new patients added.`
+    );
+  }
+}
+
+async function getQueueData() {
+  return await loadQueueFromStorage();
+}
+
+async function clearQueue() {
+  try {
+    await chrome.storage.local.remove("sante-export-queue");
+    console.log("🗑️ Queue cleared from storage");
+  } catch (error) {
+    console.error("Failed to clear queue:", error);
+  }
+}
+
+async function updateQueueIndicator() {
+  const queue = await loadQueueFromStorage();
+  const queueCount = queue.length;
+
+  const queueCountSpan = document.getElementById("queue-count");
+  const queueIndicator = document.getElementById("queue-indicator");
+
+  if (queueCountSpan) {
+    queueCountSpan.textContent = queueCount;
+  }
+
+  if (queueIndicator) {
+    if (queueCount > 0) {
+      queueIndicator.style.display = "block";
+    } else {
+      queueIndicator.style.display = "none";
+    }
+  }
+}
+
 // Show warning toast for export validation issues
 function showExportWarningToast(title, message, persistent = false) {
   const toast = document.createElement("div");
@@ -2528,4 +2757,36 @@ function showExportWarningToast(title, message, persistent = false) {
     toast.style.opacity = "0";
     setTimeout(() => toast.remove(), 300);
   }, 8000);
+}
+
+// Show success toast for queue operations
+function showSuccessToast(title, message) {
+  const toast = document.createElement("div");
+  toast.style.cssText = `
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: #28a745;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 5px;
+    z-index: 10001;
+    max-width: 400px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    font-size: 13px;
+    animation: slideIn 0.3s ease-out;
+  `;
+  toast.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
+    <div style="font-size: 12px;">${message}</div>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    toast.style.transition = "opacity 0.3s";
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
 }
