@@ -510,21 +510,6 @@ border-radius: 4px;
   " disabled>
     📥 Import Teamm (<span id="exported-count">0</span>)
   </button>
-  <button type="button" id="sante-reset-exported" style="
-    background: #dc3545;
-    color: white;
-    border: 2px solid #dc3545;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: bold;
-    display: inline-block;
-    text-align: center;
-    transition: all 0.2s;
-  " onmouseover="this.style.background='#c82333'" onmouseout="this.style.background='#dc3545'">
-    🔄 Reset Exported Status [DEV]
-  </button>
 </div>
 <div id="analysis-progress" style="display: none; margin-top: 8px; text-align: center; font-size: 12px; color: #007cba; font-weight: bold;">
   🔄 Analyzing page... (<span id="analysis-completed">0</span>/<span id="analysis-total">0</span> complete)
@@ -537,7 +522,6 @@ border-radius: 4px;
 
   document.getElementById("sante-process-export").onclick = exportData;
   document.getElementById("sante-analyze-page").onclick = analyzeCurrentPage;
-  document.getElementById("sante-reset-exported").onclick = resetExportedStatus;
 
   // Auto-submit CSV when file is selected
   const csvFileInput = document.getElementById("csv-upload");
@@ -1366,6 +1350,23 @@ async function analyzeCurrentPage() {
     total: patientsWithIDs.length,
   };
 
+  // Update button UI to show processing state
+  const analyzeButton = document.getElementById("sante-analyze-page");
+  const exportButton = document.getElementById("sante-process-export");
+
+  if (analyzeButton) {
+    analyzeButton.disabled = true;
+    analyzeButton.innerHTML = `🔄 Analyzing... (0/${patientsWithIDs.length})`;
+    analyzeButton.style.background = "#007cba";
+    analyzeButton.style.cursor = "not-allowed";
+  }
+
+  if (exportButton) {
+    exportButton.disabled = true;
+    exportButton.style.opacity = "0.5";
+    exportButton.style.cursor = "not-allowed";
+  }
+
   // Show progress indicator
   updateAnalysisProgress();
 
@@ -2062,13 +2063,34 @@ async function exportData() {
   await updateExportCount();
   console.log(`✅ Marked ${patientsToExport.length} patients as exported in localStorage`);
 
+  // Count only patients with exportable tests (mapped tests > 0)
+  const patientsWithExportableData = patientsToExport.filter((patient) => {
+    const testResults = patient.structuredData?.testResults || {};
+    let mappedCount = 0;
+
+    Object.entries(testResults).forEach(([testName, testData]) => {
+      try {
+        if (pdfProcessor && typeof pdfProcessor.mapTestNameToKey === "function") {
+          const mapped = pdfProcessor.mapTestNameToKey(testName);
+          if (mapped) mappedCount++;
+        }
+      } catch (e) {}
+    });
+
+    return mappedCount > 0;
+  });
+
   // Refresh UI to show exported badges
   await syncUIWithLocalStorage();
 
-  // Show success message
+  // Show success message with count of patients with exportable data
+  const exportMessage = patientsWithExportableData.length === patientsToExport.length
+    ? `Exported ${patientsWithExportableData.length} patients with exportable data.`
+    : `Exported ${patientsWithExportableData.length} patients with exportable data (${patientsToExport.length - patientsWithExportableData.length} had no exportable tests).`;
+
   showSuccessToast(
     "✅ Export Complete",
-    `Exported ${patientsToExport.length} patients. Data preserved in localStorage.`
+    exportMessage + " Data preserved in localStorage."
   );
 
   // Open teamm.work in new tab for auto-upload
@@ -3044,17 +3066,22 @@ async function resetExportedStatus() {
 
 function updateAnalysisProgress() {
   const progressDiv = document.getElementById("analysis-progress");
-  const completedSpan = document.getElementById("analysis-completed");
-  const totalSpan = document.getElementById("analysis-total");
-
-  if (!progressDiv || !completedSpan || !totalSpan) return;
+  const analyzeButton = document.getElementById("sante-analyze-page");
 
   if (currentPageAnalysis.isAnalyzing) {
-    progressDiv.style.display = "block";
-    completedSpan.textContent = currentPageAnalysis.completed;
-    totalSpan.textContent = currentPageAnalysis.total;
+    // Hide the duplicate progress div
+    if (progressDiv) {
+      progressDiv.style.display = "none";
+    }
+
+    // Update Analyze button to show progress
+    if (analyzeButton) {
+      analyzeButton.innerHTML = `🔄 Analyzing... (${currentPageAnalysis.completed}/${currentPageAnalysis.total})`;
+    }
   } else {
-    progressDiv.style.display = "none";
+    if (progressDiv) {
+      progressDiv.style.display = "none";
+    }
   }
 }
 
@@ -3106,6 +3133,22 @@ async function finishBatchAnalysis() {
 
   // Hide progress indicator
   updateAnalysisProgress();
+
+  // Restore button states
+  const analyzeButton = document.getElementById("sante-analyze-page");
+  const exportButton = document.getElementById("sante-process-export");
+
+  if (analyzeButton) {
+    // Restore analyze button to default state
+    analyzeButton.innerHTML = `🔍 Analizează (<span id="analyze-count">0</span>)`;
+    await updateDownloadCount(); // This will set correct state based on available patients
+  }
+
+  if (exportButton) {
+    // Re-enable export button
+    exportButton.style.opacity = "1";
+    exportButton.style.cursor = "pointer";
+  }
 }
 
 // Show warning toast for export validation issues
