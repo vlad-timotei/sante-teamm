@@ -196,7 +196,7 @@ class PDFProcessor {
       { name: "Sideremie", pattern: createTestPattern("Sideremie") },
       { name: "Colesterol total", pattern: createTestPattern("Colesterol total") },
       { name: "Trigliceride", pattern: createTestPattern("Trigliceride") },
-      { name: "Glicemie", pattern: createTestPattern("Glicemie") },
+      { name: "Glicemie", pattern: createTestPattern("(Glicemie|Glucoz[ăa]\\s+seric[ăa]?)") },
       { name: "TSH", pattern: createTestPattern("TSH") },
       { name: "FT4", pattern: createTestPattern("FT4") },
       { name: "FT3", pattern: createTestPattern("FT3") },
@@ -204,6 +204,10 @@ class PDFProcessor {
       { name: "PSA", pattern: createTestPattern("PSA") },
       { name: "CEA", pattern: createTestPattern("CEA") },
       { name: "AFP", pattern: createTestPattern("AFP") },
+      { name: "Homocisteina", pattern: createTestPattern("Homocistein[ăa]?") },
+      { name: "Proteina C Reactiva HS", pattern: createTestPattern("Protein[ăa]?\\s+C\\s+[Rr]eactiv[ăa]?\\s+HS") },
+      { name: "Indice HOMA", pattern: createTestPattern("(Indice\\s+HOMA|HOMA)") },
+      { name: "Insulina", pattern: createTestPattern("Insulin[ăa]?") },
     ];
 
     specificTests.forEach((test) => {
@@ -300,6 +304,12 @@ class PDFProcessor {
       "Magneziu",
       "seric",
       "Sideremie",
+      "Homocistein",
+      "Proteina",
+      "Reactiva",
+      "Insulina",
+      "HOMA",
+      "Indice",
       "Calciu",
       "Fosfor",
       "Albumina",
@@ -390,7 +400,7 @@ class PDFProcessor {
   }
 
   // Map raw test labels to target keys required for final docs
-  // Target keys: B12, 25OHD, TSH, FT4, ATPO, HBA1C, FERITINA, IRON, PSA, VSH, HOMOCYSTEIN, TSB, CRP
+  // Target keys: B12, 25OHD, TSH, FT4, ATPO, HBA1C, FERITINA, IRON, PSA, VSH, HOMOCYSTEIN, TSB, CRP, hsCRP, Glu, HOMA, INS
   mapTestNameToKey(rawName) {
     const name = String(rawName || '').trim();
     if (!name) return null;
@@ -409,7 +419,11 @@ class PDFProcessor {
       { key: 'VSH',          re: /\b(vsh|viteza\s*de\s*sedimentare|esr|sed[-\s]?rate)\b/i },
       { key: 'HOMOCYSTEIN',  re: /\b(homocistein[ăa]?|homocystein[e]?|hcy)\b/i },
       { key: 'TSB',          re: /\b(bilirubin[ăa]?\s*total[ăa]?|total\s*bilirubin|tsb)\b/i },
-      { key: 'CRP',          re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?|crp|hs[-\s]?crp|c[-\s]?reactive\s*protein)\b/i },
+      { key: 'hsCRP',        re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?\s+hs|hs[-\s]?crp)\b/i },
+      { key: 'CRP',          re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?(?!\s+hs)|crp(?!.*hs)|c[-\s]?reactive\s*protein)\b/i },
+      { key: 'Glu',          re: /\b(glicemie|glucoz[ăa]?\s*seric[ăa]?|glucose|blood\s*glucose)\b/i },
+      { key: 'HOMA',         re: /\b(indice\s+homa|homa(?!\s*insulin))\b/i },
+      { key: 'INS',          re: /\b(insulin[ăa]?|insulin)\b/i },
     ];
 
     for (const { key, re } of TEST_KEY_MAP) {

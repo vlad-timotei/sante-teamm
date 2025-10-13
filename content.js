@@ -5,14 +5,20 @@ let pdfProcessor = null;
 let batchQueue = []; // Store batch items locally
 
 // Wait for page to load and inject batch buttons
-document.addEventListener("DOMContentLoaded", initializeBatchExtension);
-
-// Also run immediately in case DOM is already loaded
-if (document.readyState === "loading") {
+// Only initialize if not being loaded remotely or if explicitly triggered
+if (typeof window.REMOTE_LOADING === 'undefined') {
   document.addEventListener("DOMContentLoaded", initializeBatchExtension);
-} else {
-  initializeBatchExtension();
+
+  // Also run immediately in case DOM is already loaded
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeBatchExtension);
+  } else {
+    initializeBatchExtension();
+  }
 }
+
+// Function to initialize when called from remote loader
+window.initializeSanteExtension = initializeBatchExtension;
 
 async function initializeBatchExtension() {
   // Initialize PDF processor with full PDF.js
@@ -1080,6 +1086,10 @@ function updateTestResultsColumn(elementIndex, extractedData) {
     "HOMOCYSTEIN",
     "TSB",
     "CRP",
+    "hsCRP",
+    "Glu",
+    "HOMA",
+    "INS",
   ];
   // Nice display labels for table
   const DISPLAY = {
@@ -1096,6 +1106,10 @@ function updateTestResultsColumn(elementIndex, extractedData) {
     HOMOCYSTEIN: "Homocisteina",
     TSB: "Bilirubina totală",
     CRP: "CRP (Proteina C reactivă)",
+    hsCRP: "Proteina C Reactiva HS (High Sensitive)",
+    Glu: "Glicemie (Glucoză serică)",
+    HOMA: "Indice HOMA (Rezistență la insulină)",
+    INS: "Insulina",
   };
   knownItems.sort((a, b) => {
     const ai = ORDER.indexOf(a.key);
@@ -1515,6 +1529,15 @@ function exportData() {
     return;
   }
 
+  // Generate dynamic filename: PREFIX_DD_MMM_Sante.txt
+  const now = new Date();
+  const day = now.getDate();
+  const monthNames = ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sep", "oct", "nov", "dec"];
+  const month = monthNames[now.getMonth()];
+  const filename = `${idPrefix}_${day}_${month}_Sante.txt`;
+
+  console.log(`📁 Generated filename: ${filename}`);
+
   // Use the PDF processor to generate proper CSV with PDF content
   if (pdfProcessor && includedData.length > 0) {
     console.log("Using PDF processor for CSV generation");
@@ -1526,12 +1549,12 @@ function exportData() {
       "Generated CSV content (first 500 chars):",
       csvContent.substring(0, 500)
     );
-    downloadCSV(csvContent, "sante_medical_reports.csv");
+    downloadCSV(csvContent, filename);
   } else {
     console.log("Using fallback CSV generation");
     // Fallback to simple CSV
     const csvContent = convertToCSV(includedData);
-    downloadCSV(csvContent, "sante_medical_reports.csv");
+    downloadCSV(csvContent, filename);
   }
 
   console.log(
@@ -1554,7 +1577,7 @@ function convertToCSV(data) {
 }
 
 function downloadCSV(content, filename) {
-  const blob = new Blob([content], { type: "text/csv" });
+  const blob = new Blob([content], { type: "text/plain" });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -2150,6 +2173,7 @@ function normalizedName(name) {
       const map = { ă: "a", â: "a", î: "i", ș: "s", ț: "t" };
       return map[match] || match;
     })
+    .replace(/[-_]/g, " ") // Replace dashes and underscores with spaces
     .replace(/[^a-z\s]/g, "") // Remove non-letter characters
     .replace(/\s+/g, " ") // Normalize spaces
     .trim();
