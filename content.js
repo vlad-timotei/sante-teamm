@@ -4,6 +4,14 @@ let extractedData = [];
 let pdfProcessor = null;
 let batchQueue = []; // Store batch items locally
 
+// Analysis state for batch processing
+let currentPageAnalysis = {
+  isAnalyzing: false,
+  patients: [],
+  completed: 0,
+  total: 0
+};
+
 // Wait for page to load and inject batch buttons
 // Only initialize if not being loaded remotely or if explicitly triggered
 if (typeof window.REMOTE_LOADING === "undefined") {
@@ -35,10 +43,10 @@ async function initializeBatchExtension() {
     injectBatchButtons(downloadElements);
     createSingleProcessButton();
 
-    // Load and display queue indicator
-    setTimeout(() => {
-      updateQueueIndicator();
-    }, 100);
+    // Sync UI with localStorage (delayed to let table load)
+    setTimeout(async () => {
+      await syncUIWithLocalStorage();
+    }, 1500);
 
     // Check for stored CSV data after everything is set up
     setTimeout(() => {
@@ -46,6 +54,127 @@ async function initializeBatchExtension() {
       tryLoadAnyStoredData();
     }, 500);
   }
+}
+
+async function syncUIWithLocalStorage() {
+  console.log("🔄 Syncing UI with localStorage...");
+
+  // Load queue from localStorage
+  const queue = await loadQueueFromStorage();
+  console.log(`📦 Found ${queue.length} patients in localStorage`);
+
+  // Get all table rows
+  const table = document.getElementById("ctl00_contentMain_dgGrid");
+  if (!table) {
+    console.warn("⚠️ Table not found for UI sync");
+    return;
+  }
+
+  const rows = table.querySelectorAll("tr");
+
+  rows.forEach((row, rowIndex) => {
+    const cells = row.querySelectorAll("td");
+    if (cells.length < 2) return; // Skip header/empty rows
+
+    const nameCell = cells[1];
+    if (!nameCell) return;
+
+    const patientName = nameCell.textContent.trim().toLowerCase();
+    if (!patientName) return;
+
+    // Find corresponding batch button
+    const batchCell = row.querySelector('[id^="batch-cell-"]');
+    if (!batchCell) return;
+
+    const batchBtn = batchCell.querySelector("button");
+    if (!batchBtn) return;
+
+    // Check if patient exists in localStorage
+    const storedPatient = queue.find(
+      (p) => p.patientInfo?.nume?.trim().toLowerCase() === patientName
+    );
+
+    if (storedPatient) {
+      if (storedPatient.excluded === false) {
+        // In storage, not excluded → green checkmark
+        batchBtn.textContent = "✓";
+        batchBtn.style.background = "#28a745";
+        batchBtn.setAttribute("data-batched", "true");
+        row.style.opacity = "1";
+        row.style.backgroundColor = "";
+
+        // Restore test results cell styling and populate with stored data
+        const testResultCell = row.querySelector('[id^="test-results-"]');
+        if (testResultCell) {
+          testResultCell.style.opacity = "1";
+          testResultCell.style.backgroundColor = "";
+
+          // Remove excluded indicator if it exists
+          const excludedIndicator = testResultCell.querySelector(
+            ".excluded-indicator"
+          );
+          if (excludedIndicator) {
+            excludedIndicator.remove();
+          }
+
+          // Populate test results from stored data
+          displayTestResults(testResultCell, storedPatient);
+          console.log(`📊 Populated test results for ${storedPatient.patientInfo.nume}`);
+        }
+
+        console.log(`✅ Synced UI for ${storedPatient.patientInfo.nume}: not excluded`);
+      } else {
+        // In storage, excluded → greyed out
+        batchBtn.textContent = "+";
+        batchBtn.style.background = "#007cba";
+        batchBtn.setAttribute("data-batched", "false");
+        row.style.opacity = "0.5";
+        row.style.backgroundColor = "#f8f9fa";
+
+        // Grey out test results cell
+        const testResultCell = row.querySelector('[id^="test-results-"]');
+        if (testResultCell) {
+          testResultCell.style.opacity = "0.5";
+          testResultCell.style.backgroundColor = "#e9ecef";
+
+          // Add excluded indicator if not present
+          const excludedIndicator = testResultCell.querySelector(
+            ".excluded-indicator"
+          );
+          if (!excludedIndicator) {
+            const indicator = document.createElement("div");
+            indicator.className = "excluded-indicator";
+            indicator.style.cssText = `
+              background: #6c757d;
+              color: white;
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-size: 10px;
+              margin-top: 5px;
+            `;
+            indicator.textContent = "🚫 Excluded from export";
+            testResultCell.appendChild(indicator);
+          }
+        }
+
+        console.log(`🚫 Synced UI for ${storedPatient.patientInfo.nume}: excluded`);
+      }
+    } else {
+      // Not in storage → default "+" button
+      batchBtn.textContent = "+";
+      batchBtn.style.background = "#007cba";
+      batchBtn.setAttribute("data-batched", "false");
+      row.style.opacity = "1";
+      row.style.backgroundColor = "";
+
+      console.log(`➕ Patient ${patientName} not in storage, showing default button`);
+    }
+  });
+
+  // Update export count based on localStorage
+  await updateExportCount();
+
+  console.log("✅ UI sync complete");
 }
 
 function addTestResultsColumn() {
@@ -328,7 +457,7 @@ border-radius: 4px;
     📁 Choose CSV File
   </label>
   <input type="file" id="csv-upload" accept=".csv" style="display: none;">
-  <button type="button" id="sante-download-all" style="
+  <button type="button" id="sante-analyze-page" style="
     background: #6c757d;
     color: white;
     border: 2px solid #6c757d;
@@ -342,23 +471,7 @@ border-radius: 4px;
     text-align: center;
     transition: all 0.2s;
   " disabled>
-    📥 Download All (<span id="download-count">0</span>)
-  </button>
-  <button type="button" id="sante-add-to-queue" style="
-    background: #6c757d;
-    color: white;
-    border: 2px solid #6c757d;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: not-allowed;
-    font-size: 12px;
-    font-weight: bold;
-    opacity: 0.6;
-    display: inline-block;
-    text-align: center;
-    transition: all 0.2s;
-  " disabled>
-    📦 Add to Queue (<span id="queue-add-count">0</span>)
+    🔍 Analyze Page (<span id="analyze-count">0</span>)
   </button>
   <button type="button" id="sante-process-export" style="
     background: #6c757d;
@@ -377,8 +490,8 @@ border-radius: 4px;
     📥 Export (<span id="exported-count">0</span>)
   </button>
 </div>
-<div id="queue-indicator" style="margin-top: 8px; text-align: center; font-size: 12px; color: #666; display: none;">
-  📦 Queue: <span id="queue-count">0</span> patient(s)
+<div id="analysis-progress" style="display: none; margin-top: 8px; text-align: center; font-size: 12px; color: #007cba; font-weight: bold;">
+  🔄 Analyzing page... (<span id="analysis-completed">0</span>/<span id="analysis-total">0</span> complete)
 </div>
 <div id="match-results" style="display: none;"></div>
   `;
@@ -387,8 +500,7 @@ border-radius: 4px;
   table.parentNode.insertBefore(buttonContainer, table);
 
   document.getElementById("sante-process-export").onclick = exportData;
-  document.getElementById("sante-download-all").onclick = downloadAllWithIDs;
-  document.getElementById("sante-add-to-queue").onclick = addCurrentPageToQueue;
+  document.getElementById("sante-analyze-page").onclick = analyzeCurrentPage;
 
   // Auto-submit CSV when file is selected
   const csvFileInput = document.getElementById("csv-upload");
@@ -402,15 +514,15 @@ border-radius: 4px;
 
 // Status display is now integrated into the main control panel
 
-function toggleBatch(element, index, batchBtn) {
+async function toggleBatch(element, index, batchBtn) {
   const isCurrentlyBatched = batchBtn.getAttribute("data-batched") === "true";
 
   if (isCurrentlyBatched) {
     // Remove from batch
-    removeFromBatch(element, index, batchBtn);
+    await removeFromBatch(element, index, batchBtn);
   } else {
     // Add to batch
-    addToBatch(element, index, batchBtn);
+    await addToBatch(element, index, batchBtn);
   }
 }
 
@@ -478,36 +590,15 @@ async function addToBatch(element, index, batchBtn) {
     patientText: patientText, // Store the patient-specific text
   };
 
-  batchCounter++;
+  const patientName = patientData.nume.trim().toLowerCase();
 
-  // Store locally first, then try to sync with background
-  const batchItem = {
-    id: `pdf_${batchCounter}`,
-    elementId: element.id,
-    patientData: patientData,
-    elementIndex: index,
-    timestamp: Date.now(),
-  };
-
-  batchQueue.push(batchItem);
-
-  // Store locally (Chrome extension background script removed for Tampermonkey)
-  console.log("Storing batch item locally:", batchItem);
-
-  updateBatchCount(batchQueue.length);
-
-  // Visual feedback - mark as added and processing
-  batchBtn.textContent = "⏳";
-  batchBtn.style.background = "#ffc107";
-  batchBtn.setAttribute("data-batched", "true");
-  batchBtn.setAttribute("data-element-id", element.id);
-
-  console.log(
-    `%c✅ ADDED TO BATCH: ${patientData.nume} - Auto-processing...`,
-    "color: green; font-weight: bold"
+  // Load localStorage to check if patient already exists
+  const queue = await loadQueueFromStorage();
+  const existingPatient = queue.find(
+    (p) => p.patientInfo?.nume?.trim().toLowerCase() === patientName
   );
 
-  // Restore row styling if it was previously excluded
+  // Restore row styling
   if (row) {
     row.style.opacity = "1";
     row.style.backgroundColor = "";
@@ -528,21 +619,129 @@ async function addToBatch(element, index, batchBtn) {
     }
   }
 
+  if (existingPatient) {
+    // Patient exists in localStorage - just mark as not excluded
+    existingPatient.excluded = false;
+    // Update patient text in case it changed
+    existingPatient.patientInfo.patientText = patientText;
+
+    // Update button to show completed (no download needed)
+    batchBtn.textContent = "✓";
+    batchBtn.style.background = "#28a745";
+    batchBtn.setAttribute("data-batched", "true");
+    batchBtn.setAttribute("data-element-id", element.id);
+
+    // Populate test results from stored data
+    if (testResultCell) {
+      displayTestResults(testResultCell, existingPatient);
+      console.log(`📊 Refreshed test results for ${patientData.nume}`);
+    }
+
+    console.log(
+      `%c✅ MARKED AS EXPORTABLE: ${patientData.nume} (already in storage, no re-download)`,
+      "color: green; font-weight: bold"
+    );
+
+    // Handle batch vs single mode
+    if (currentPageAnalysis.isAnalyzing) {
+      // Batch mode: Don't save yet, just increment counter
+      currentPageAnalysis.completed++;
+      updateAnalysisProgress();
+
+      console.log(
+        `%c📦 Batch progress: ${currentPageAnalysis.completed}/${currentPageAnalysis.total}`,
+        "color: blue; font-weight: bold"
+      );
+
+      // Check if this is the last patient
+      if (currentPageAnalysis.completed === currentPageAnalysis.total) {
+        // Need to save the queue since we modified existingPatient
+        await saveQueueToStorage(queue);
+        // All patients processed - do batch save/update
+        await finishBatchAnalysis();
+      }
+    } else {
+      // Single mode: Save immediately
+      await saveQueueToStorage(queue);
+      await updateExportCount();
+    }
+
+    return;
+  }
+
+  // Patient not in localStorage - download and add
+  batchCounter++;
+
+  const batchItem = {
+    id: `pdf_${batchCounter}`,
+    elementId: element.id,
+    patientData: patientData,
+    elementIndex: index,
+    timestamp: Date.now(),
+  };
+
+  batchQueue.push(batchItem);
+
+  console.log("Storing batch item locally:", batchItem);
+
+  updateBatchCount(batchQueue.length);
+
+  // Visual feedback - mark as added and processing
+  batchBtn.textContent = "⏳";
+  batchBtn.style.background = "#ffc107";
+  batchBtn.setAttribute("data-batched", "true");
+  batchBtn.setAttribute("data-element-id", element.id);
+
+  console.log(
+    `%c✅ ADDED TO BATCH: ${patientData.nume} - Auto-processing...`,
+    "color: green; font-weight: bold"
+  );
+
   // Auto-process this PDF immediately
   try {
     await downloadAndProcessPDF(element, batchItem);
 
-    // Mark as included if it was previously excluded
+    // Find extracted data and add to localStorage
     const extractedItem = extractedData.find(
       (item) =>
         item.debugInfo?.elementIndex === index || item.id === batchItem.id
     );
+
     if (extractedItem) {
       extractedItem.excluded = false;
-      console.log(
-        `%c✅ MARKED AS INCLUDED: ${extractedItem.patientInfo?.nume}`,
-        "color: green; font-weight: bold"
-      );
+
+      // Check if we're in batch analysis mode
+      if (currentPageAnalysis.isAnalyzing) {
+        // Batch mode: Store in memory, don't save to localStorage yet
+        currentPageAnalysis.patients.push(extractedItem);
+        currentPageAnalysis.completed++;
+
+        console.log(
+          `%c✅ ADDED TO BATCH: ${extractedItem.patientInfo?.nume} (${currentPageAnalysis.completed}/${currentPageAnalysis.total})`,
+          "color: green; font-weight: bold"
+        );
+
+        // Update progress indicator
+        updateAnalysisProgress();
+
+        // Check if this is the last patient
+        if (currentPageAnalysis.completed === currentPageAnalysis.total) {
+          // All patients processed - do batch save
+          await finishBatchAnalysis();
+        }
+      } else {
+        // Single mode: Save to localStorage immediately
+        queue.push(extractedItem);
+        await saveQueueToStorage(queue);
+
+        console.log(
+          `%c✅ SAVED TO LOCALSTORAGE: ${extractedItem.patientInfo?.nume}`,
+          "color: green; font-weight: bold"
+        );
+
+        // Update export count for single mode
+        await updateExportCount();
+      }
     }
 
     // Update button to show completed
@@ -553,7 +752,6 @@ async function addToBatch(element, index, batchBtn) {
       `%c🎉 AUTO-PROCESSING COMPLETE: ${patientData.nume}`,
       "color: green; font-weight: bold"
     );
-    updateExportCount();
   } catch (error) {
     // Isolated error handling - this failure should not affect other downloads
     console.error(
@@ -589,12 +787,67 @@ async function addToBatch(element, index, batchBtn) {
       "color: orange; font-weight: bold"
     );
 
-    updateExportCount();
+    // Handle batch mode for failed downloads
+    if (currentPageAnalysis.isAnalyzing) {
+      currentPageAnalysis.completed++;
+      updateAnalysisProgress();
+
+      // Check if this was the last patient (even though it failed)
+      if (currentPageAnalysis.completed === currentPageAnalysis.total) {
+        await finishBatchAnalysis();
+      }
+    } else {
+      // Single mode: Update export count
+      await updateExportCount();
+    }
   }
 }
 
-function removeFromBatch(element, index, batchBtn) {
-  // Find and remove the item from batchQueue
+async function removeFromBatch(element, index, batchBtn) {
+  // Get patient name from table row
+  const row = element.closest("tr");
+  const cells = row.querySelectorAll("td");
+  const patientName = cells[1]?.textContent.trim().toLowerCase();
+
+  if (!patientName) {
+    console.error("❌ Cannot remove from batch: Patient name not found");
+    return;
+  }
+
+  // Load localStorage and mark patient as excluded
+  const queue = await loadQueueFromStorage();
+  const patient = queue.find(
+    (p) => p.patientInfo?.nume?.trim().toLowerCase() === patientName
+  );
+
+  if (patient) {
+    patient.excluded = true;
+    await saveQueueToStorage(queue);
+    console.log(
+      `%c🚫 MARKED AS EXCLUDED IN LOCALSTORAGE: ${patient.patientInfo.nume}`,
+      "color: gray; font-weight: bold"
+    );
+  } else {
+    console.warn(
+      `⚠️ Patient ${patientName} not found in localStorage, cannot mark as excluded`
+    );
+  }
+
+  // Mark extracted data as excluded (for current page state)
+  const extractedItem = extractedData.find(
+    (item) =>
+      item.patientInfo?.nume?.trim().toLowerCase() === patientName
+  );
+
+  if (extractedItem) {
+    extractedItem.excluded = true;
+    console.log(
+      `%c🚫 MARKED AS EXCLUDED IN CURRENT PAGE: ${extractedItem.patientInfo?.nume}`,
+      "color: gray; font-weight: bold"
+    );
+  }
+
+  // Find and remove from batchQueue
   const elementId = element.id;
   const itemIndex = batchQueue.findIndex(
     (item) => item.elementId === elementId
@@ -603,26 +856,8 @@ function removeFromBatch(element, index, batchBtn) {
   if (itemIndex !== -1) {
     const removedItem = batchQueue.splice(itemIndex, 1)[0];
     console.log(
-      `%c❌ REMOVED FROM BATCH: ${removedItem.patientData.nume}`,
+      `%c❌ REMOVED FROM BATCH QUEUE: ${removedItem.patientData.nume}`,
       "color: orange; font-weight: bold"
-    );
-  }
-
-  // Mark extracted data as excluded
-  const extractedItem = extractedData.find((item) => {
-    const batchItem =
-      batchQueue.find((batch) => batch.elementId === elementId) ||
-      extractedData.find(
-        (extracted) => extracted.debugInfo?.elementIndex === index
-      );
-    return batchItem ? item.id === batchItem.id : extracted === item;
-  });
-
-  if (extractedItem) {
-    extractedItem.excluded = true;
-    console.log(
-      `%c🚫 MARKED AS EXCLUDED: ${extractedItem.patientInfo?.nume}`,
-      "color: gray; font-weight: bold"
     );
   }
 
@@ -635,7 +870,6 @@ function removeFromBatch(element, index, batchBtn) {
   batchBtn.removeAttribute("data-element-id");
 
   // Grey out the table row and test results
-  const row = element.closest("tr");
   if (row) {
     row.style.opacity = "0.5";
     row.style.backgroundColor = "#f8f9fa";
@@ -668,7 +902,7 @@ function removeFromBatch(element, index, batchBtn) {
   }
 
   // Update export count
-  updateExportCount();
+  await updateExportCount();
 }
 
 async function processAndExportAll() {
@@ -867,31 +1101,28 @@ function updateBatchCount(count) {
   }
 }
 
-function updateExportCount() {
-  const exportCount = extractedData.filter((item) => !item.excluded).length;
+async function updateExportCount() {
+  // Load from localStorage (not current page's extractedData)
+  const queue = await loadQueueFromStorage();
+  const exportCount = queue.filter((p) => p.excluded === false).length;
+
   const countElement = document.getElementById("exported-count");
   const exportButton = document.getElementById("sante-process-export");
-  const queueAddCountElement = document.getElementById("queue-add-count");
-  const queueAddButton = document.getElementById("sante-add-to-queue");
 
   if (countElement) {
     countElement.textContent = exportCount;
   }
 
-  if (queueAddCountElement) {
-    queueAddCountElement.textContent = exportCount;
-  }
-
   if (exportButton) {
     if (exportCount > 0) {
-      // Enable button when results are available
+      // Enable button when localStorage has non-excluded patients
       exportButton.disabled = false;
       exportButton.style.background = "#007cba";
       exportButton.style.borderColor = "#007cba";
       exportButton.style.cursor = "pointer";
       exportButton.style.opacity = "1";
     } else {
-      // Disable button when no results are available
+      // Disable button when no exportable patients
       exportButton.disabled = true;
       exportButton.style.background = "#6c757d";
       exportButton.style.borderColor = "#6c757d";
@@ -899,30 +1130,12 @@ function updateExportCount() {
       exportButton.style.opacity = "0.6";
     }
   }
-
-  if (queueAddButton) {
-    if (exportCount > 0) {
-      // Enable "Add to Queue" button when results are available
-      queueAddButton.disabled = false;
-      queueAddButton.style.background = "#17a2b8";
-      queueAddButton.style.borderColor = "#17a2b8";
-      queueAddButton.style.cursor = "pointer";
-      queueAddButton.style.opacity = "1";
-    } else {
-      // Disable button when no results are available
-      queueAddButton.disabled = true;
-      queueAddButton.style.background = "#6c757d";
-      queueAddButton.style.borderColor = "#6c757d";
-      queueAddButton.style.cursor = "not-allowed";
-      queueAddButton.style.opacity = "0.6";
-    }
-  }
 }
 
 function updateDownloadCount() {
   // Count how many patients have ID suffixes filled in AND have ready status
   const patientInputs = document.querySelectorAll('input[id^="patient-text-"]');
-  const downloadCount = Array.from(patientInputs).filter((input) => {
+  const analyzeCount = Array.from(patientInputs).filter((input) => {
     if (input.value.trim() === "") return false;
 
     // Check patient status
@@ -939,36 +1152,36 @@ function updateDownloadCount() {
     return false;
   }).length;
 
-  const countElement = document.getElementById("download-count");
-  const downloadButton = document.getElementById("sante-download-all");
+  const countElement = document.getElementById("analyze-count");
+  const analyzeButton = document.getElementById("sante-analyze-page");
 
   if (countElement) {
-    countElement.textContent = downloadCount;
+    countElement.textContent = analyzeCount;
   }
 
-  if (downloadButton) {
-    if (downloadCount > 0) {
+  if (analyzeButton) {
+    if (analyzeCount > 0) {
       // Enable button when patients with IDs are available
-      downloadButton.disabled = false;
-      downloadButton.style.background = "#ffc107";
-      downloadButton.style.borderColor = "#ffc107";
-      downloadButton.style.color = "#212529";
-      downloadButton.style.cursor = "pointer";
-      downloadButton.style.opacity = "1";
+      analyzeButton.disabled = false;
+      analyzeButton.style.background = "#ffc107";
+      analyzeButton.style.borderColor = "#ffc107";
+      analyzeButton.style.color = "#212529";
+      analyzeButton.style.cursor = "pointer";
+      analyzeButton.style.opacity = "1";
     } else {
       // Disable button when no patients have IDs
-      downloadButton.disabled = true;
-      downloadButton.style.background = "#6c757d";
-      downloadButton.style.borderColor = "#6c757d";
-      downloadButton.style.color = "white";
-      downloadButton.style.cursor = "not-allowed";
-      downloadButton.style.opacity = "0.6";
+      analyzeButton.disabled = true;
+      analyzeButton.style.background = "#6c757d";
+      analyzeButton.style.borderColor = "#6c757d";
+      analyzeButton.style.color = "white";
+      analyzeButton.style.cursor = "not-allowed";
+      analyzeButton.style.opacity = "0.6";
     }
   }
 }
 
-async function downloadAllWithIDs() {
-  console.log("🔄 Starting download all with IDs...");
+async function analyzeCurrentPage() {
+  console.log("🔄 Starting page analysis...");
 
   // Find all patients with filled ID suffixes
   const patientInputs = document.querySelectorAll('input[id^="patient-text-"]');
@@ -1030,6 +1243,17 @@ async function downloadAllWithIDs() {
     `📥 Found ${patientsWithIDs.length} patients with IDs to download`
   );
 
+  // Enable batch analysis mode
+  currentPageAnalysis = {
+    isAnalyzing: true,
+    patients: [],
+    completed: 0,
+    total: patientsWithIDs.length
+  };
+
+  // Show progress indicator
+  updateAnalysisProgress();
+
   // Trigger batch processing for each patient with a delay to avoid overwhelming the server
   // Each download is isolated - if one fails, others will continue
   for (let i = 0; i < patientsWithIDs.length; i++) {
@@ -1060,27 +1284,10 @@ async function downloadAllWithIDs() {
   );
 }
 
-function updateTestResultsColumn(elementIndex, extractedData) {
-  const testResultCell = document.getElementById(
-    `test-results-${elementIndex}`
-  );
+function displayTestResults(testResultCell, extractedData) {
+  // Format test results for display (helper function - reusable)
+  if (!testResultCell) return;
 
-  if (!testResultCell) {
-    console.warn(
-      `Test result cell not found for index ${elementIndex}. Available cells:`,
-      Array.from(document.querySelectorAll('[id^="test-results-"]')).map(
-        (cell) => cell.id
-      )
-    );
-    return;
-  }
-
-  console.log(
-    `%c📊 UPDATING TEST RESULTS for index ${elementIndex}`,
-    "color: blue; font-weight: bold"
-  );
-
-  // Format test results for display
   if (extractedData.error) {
     testResultCell.innerHTML = `
   <span style="color: #dc3545;">❌ Error: ${extractedData.error}</span>
@@ -1187,6 +1394,30 @@ function updateTestResultsColumn(elementIndex, extractedData) {
   testResultCell.innerHTML = testsHtml;
   testResultCell.style.color = "#000";
   testResultCell.title = `Full test results for this patient (${mappedTestCount} mapped, ${otherItems.length} unmapped).`;
+}
+
+function updateTestResultsColumn(elementIndex, extractedData) {
+  const testResultCell = document.getElementById(
+    `test-results-${elementIndex}`
+  );
+
+  if (!testResultCell) {
+    console.warn(
+      `Test result cell not found for index ${elementIndex}. Available cells:`,
+      Array.from(document.querySelectorAll('[id^="test-results-"]')).map(
+        (cell) => cell.id
+      )
+    );
+    return;
+  }
+
+  console.log(
+    `%c📊 UPDATING TEST RESULTS for index ${elementIndex}`,
+    "color: blue; font-weight: bold"
+  );
+
+  // Use helper function to display results
+  displayTestResults(testResultCell, extractedData);
 }
 
 async function downloadAndProcessPDF(downloadLink, batchItem) {
@@ -1551,7 +1782,6 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
 
 async function exportData() {
   console.log("=== EXPORT DEBUG ===");
-  console.log("Number of extracted items:", extractedData.length);
 
   // Check for ID prefix
   const idPrefix = document.getElementById("id-prefix")?.value.trim();
@@ -1560,59 +1790,24 @@ async function exportData() {
     return;
   }
 
-  // Load queue from storage
-  const queueData = await getQueueData();
-  console.log(`📦 Queue loaded: ${queueData.length} patients`);
+  // Load ALL patients from localStorage (not current page)
+  const allPatients = await getQueueData();
+  console.log(`📦 Total patients in localStorage: ${allPatients.length}`);
 
-  // Filter out excluded items from current page
-  const currentPageData = extractedData.filter((item) => !item.excluded);
-  console.log("Current page items to export:", currentPageData.length);
-  console.log("Excluded items:", extractedData.length - currentPageData.length);
+  // Filter non-excluded patients
+  const patientsToExport = allPatients.filter((p) => p.excluded === false);
+  console.log(`📊 Patients to export (non-excluded): ${patientsToExport.length}`);
+  console.log(`🚫 Excluded patients: ${allPatients.length - patientsToExport.length}`);
 
-  // Merge queue + current page data, removing duplicates by patient name
-  let allData = [...queueData];
-  const queueNames = new Set(
-    queueData.map((item) => item.patientInfo?.nume?.trim().toLowerCase())
-  );
-
-  const duplicatesFromCurrentPage = [];
-  currentPageData.forEach((patient) => {
-    const patientName = patient.patientInfo?.nume?.trim().toLowerCase();
-    if (!patientName) {
-      console.warn("⚠️ Skipping patient with no name from current page:", patient);
-      return;
-    }
-
-    if (queueNames.has(patientName)) {
-      duplicatesFromCurrentPage.push(patient.patientInfo.nume);
-      console.log(`⚠️ Duplicate found in current page: ${patient.patientInfo.nume} (already in queue)`);
-    } else {
-      allData.push(patient);
-    }
-  });
-
-  // Show warning for duplicates from current page
-  if (duplicatesFromCurrentPage.length > 0) {
-    duplicatesFromCurrentPage.forEach((name) => {
-      showExportWarningToast(
-        "⚠️ Duplicate skipped",
-        `Patient "${name}" from current page already in queue`,
-        false
-      );
-    });
-  }
-
-  console.log(`📊 Total patients for export: ${allData.length} (${queueData.length} from queue, ${currentPageData.length - duplicatesFromCurrentPage.length} from current page)`);
-
-  if (allData.length === 0) {
+  if (patientsToExport.length === 0) {
     alert(
-      "No data to export! All items have been excluded or no data was extracted."
+      "No data to export! All patients have been excluded or no data was extracted."
     );
     return;
   }
 
   // Check if all included patients have ID suffixes
-  const missingIds = allData.filter(
+  const missingIds = patientsToExport.filter(
     (item) => !item.patientInfo?.patientText
   );
   if (missingIds.length > 0) {
@@ -1646,10 +1841,10 @@ async function exportData() {
 
   // Use the PDF processor to generate proper CSV with PDF content
   let csvContent;
-  if (pdfProcessor && allData.length > 0) {
+  if (pdfProcessor && patientsToExport.length > 0) {
     console.log("Using PDF processor for CSV generation");
     csvContent = pdfProcessor.generateCSVFromExtractedData(
-      allData,
+      patientsToExport,
       idPrefix
     );
     console.log(
@@ -1659,7 +1854,7 @@ async function exportData() {
 
     // Validate export completeness
     const validationIssues = pdfProcessor.validateExportCompleteness(
-      allData,
+      patientsToExport,
       csvContent
     );
     if (validationIssues.length > 0) {
@@ -1676,13 +1871,13 @@ async function exportData() {
       });
     } else {
       console.log(
-        `✅ Export validation passed: All ${allData.length} patients exported successfully`
+        `✅ Export validation passed: All ${patientsToExport.length} patients exported successfully`
       );
     }
   } else {
     console.log("Using fallback CSV generation");
     // Fallback to simple CSV
-    csvContent = convertToCSV(allData);
+    csvContent = convertToCSV(patientsToExport);
   }
 
   // Download file locally
@@ -1693,15 +1888,14 @@ async function exportData() {
 
   // Clear the queue after successful export
   await clearQueue();
-  await updateQueueIndicator();
-  console.log("🗑️ Queue cleared after successful export");
+  await updateExportCount();
+  console.log("🗑️ localStorage cleared after successful export");
 
-  // Show success message with breakdown
-  const successMessage = queueData.length > 0
-    ? `Exported ${allData.length} patients total (${queueData.length} from queue, ${currentPageData.length - duplicatesFromCurrentPage.length} from current page)`
-    : `Exported ${allData.length} patients from current page`;
-
-  showSuccessToast("✅ Export Complete", successMessage);
+  // Show success message
+  showSuccessToast(
+    "✅ Export Complete",
+    `Exported ${patientsToExport.length} patients. localStorage cleared.`
+  );
 
   // Open teamm.work in new tab for auto-upload
   window.open(
@@ -1710,7 +1904,7 @@ async function exportData() {
   );
 
   console.log(
-    `✅ Exported ${allData.length} items (${queueData.length} from queue, ${currentPageData.length - duplicatesFromCurrentPage.length} from current page) - Downloaded locally AND opening teamm.work for upload`
+    `✅ Exported ${patientsToExport.length} patients from localStorage - Downloaded locally AND opening teamm.work for upload`
   );
 }
 
@@ -1923,7 +2117,7 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
     setTimeout(() => {
       const clearButton = document.getElementById("clear-csv-data");
       if (clearButton) {
-        clearButton.onclick = function (e) {
+        clearButton.onclick = async function (e) {
           e.preventDefault();
           e.stopPropagation();
 
@@ -1941,7 +2135,7 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
           }
 
           // Update export count
-          updateExportCount();
+          await updateExportCount();
 
           console.log(`🗑️ Cleared stored CSV data and reset interface`);
         };
@@ -2617,82 +2811,6 @@ async function saveQueueToStorage(queue) {
   }
 }
 
-async function addCurrentPageToQueue() {
-  console.log("📦 Adding current page to queue...");
-
-  // Get non-excluded extracted data from current page
-  const currentPageData = extractedData.filter((item) => !item.excluded);
-
-  if (currentPageData.length === 0) {
-    alert("No patients to add to queue. Please process some patients first.");
-    return;
-  }
-
-  // Load existing queue
-  const existingQueue = await loadQueueFromStorage();
-
-  // Check for duplicates by patient name
-  const duplicates = [];
-  const newPatients = [];
-
-  currentPageData.forEach((patient) => {
-    const patientName = patient.patientInfo?.nume?.trim().toLowerCase();
-    if (!patientName) {
-      console.warn("⚠️ Skipping patient with no name:", patient);
-      return;
-    }
-
-    // Check if patient already exists in queue
-    const isDuplicate = existingQueue.some(
-      (queuedPatient) =>
-        queuedPatient.patientInfo?.nume?.trim().toLowerCase() === patientName
-    );
-
-    if (isDuplicate) {
-      duplicates.push(patient.patientInfo.nume);
-    } else {
-      newPatients.push(patient);
-    }
-  });
-
-  // Show warnings for duplicates
-  if (duplicates.length > 0) {
-    duplicates.forEach((name) => {
-      showExportWarningToast(
-        "⚠️ Duplicate patient",
-        `Patient "${name}" already in queue, skipping duplicate`,
-        false
-      );
-    });
-  }
-
-  // Add new patients to queue
-  if (newPatients.length > 0) {
-    const updatedQueue = [...existingQueue, ...newPatients];
-    await saveQueueToStorage(updatedQueue);
-
-    // Show success message
-    const successMsg =
-      duplicates.length > 0
-        ? `Added ${newPatients.length} patient(s) to queue (${duplicates.length} duplicates skipped)`
-        : `Added ${newPatients.length} patient(s) to queue`;
-
-    showSuccessToast("✅ Queue Updated", successMsg);
-
-    console.log(
-      `✅ Added ${newPatients.length} patients to queue (${duplicates.length} duplicates skipped)`
-    );
-    console.log(`📦 Total queue size: ${updatedQueue.length} patients`);
-
-    // Update queue indicator
-    updateQueueIndicator();
-  } else {
-    alert(
-      `All ${currentPageData.length} patient(s) are already in the queue. No new patients added.`
-    );
-  }
-}
-
 async function getQueueData() {
   return await loadQueueFromStorage();
 }
@@ -2706,24 +2824,63 @@ async function clearQueue() {
   }
 }
 
-async function updateQueueIndicator() {
+function updateAnalysisProgress() {
+  const progressDiv = document.getElementById("analysis-progress");
+  const completedSpan = document.getElementById("analysis-completed");
+  const totalSpan = document.getElementById("analysis-total");
+
+  if (!progressDiv || !completedSpan || !totalSpan) return;
+
+  if (currentPageAnalysis.isAnalyzing) {
+    progressDiv.style.display = "block";
+    completedSpan.textContent = currentPageAnalysis.completed;
+    totalSpan.textContent = currentPageAnalysis.total;
+  } else {
+    progressDiv.style.display = "none";
+  }
+}
+
+async function finishBatchAnalysis() {
+  console.log("🎉 Batch analysis complete! Saving to localStorage...");
+
+  // Reload queue to get latest state, then merge
   const queue = await loadQueueFromStorage();
-  const queueCount = queue.length;
 
-  const queueCountSpan = document.getElementById("queue-count");
-  const queueIndicator = document.getElementById("queue-indicator");
+  // Remove duplicates by name
+  const existingNames = new Set(
+    queue.map(p => p.patientInfo?.nume?.trim().toLowerCase())
+  );
 
-  if (queueCountSpan) {
-    queueCountSpan.textContent = queueCount;
-  }
+  const newPatients = currentPageAnalysis.patients.filter(p => {
+    const name = p.patientInfo?.nume?.trim().toLowerCase();
+    return !existingNames.has(name);
+  });
 
-  if (queueIndicator) {
-    if (queueCount > 0) {
-      queueIndicator.style.display = "block";
-    } else {
-      queueIndicator.style.display = "none";
-    }
-  }
+  const merged = [...queue, ...newPatients];
+  await saveQueueToStorage(merged);
+
+  console.log(`✅ Saved ${newPatients.length} new patients to localStorage (${currentPageAnalysis.patients.length - newPatients.length} duplicates skipped)`);
+
+  // Update export count
+  await updateExportCount();
+
+  // Show success toast
+  const message = newPatients.length === currentPageAnalysis.patients.length
+    ? `Added ${newPatients.length} patients`
+    : `Added ${newPatients.length} patients (${currentPageAnalysis.patients.length - newPatients.length} duplicates skipped)`;
+
+  showSuccessToast("✅ Analysis Complete", message);
+
+  // Reset state
+  currentPageAnalysis = {
+    isAnalyzing: false,
+    patients: [],
+    completed: 0,
+    total: 0
+  };
+
+  // Hide progress indicator
+  updateAnalysisProgress();
 }
 
 // Show warning toast for export validation issues
