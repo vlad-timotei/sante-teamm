@@ -7,11 +7,14 @@
   "permissions": [
     "webRequest",
     "storage",
-    "downloads"
+    "downloads",
+    "tabs",
+    "notifications"
   ],
 
   "host_permissions": [
-    "*://rezultateptmedici.clinica-sante.ro/*"
+    "*://rezultateptmedici.clinica-sante.ro/*",
+    "*://teamm.work/admin/guests/intake-values-import-dumbrava"
   ],
 
   "background": {
@@ -23,6 +26,11 @@
       "matches": ["*://rezultateptmedici.clinica-sante.ro/*"],
       "js": ["pdf.min.js", "pdf-processor.js", "content.js"],
       "run_at": "document_end"
+    },
+    {
+      "matches": ["*://teamm.work/admin/guests/intake-values-import-dumbrava"],
+      "js": ["teamm-uploader.js"],
+      "run_at": "document_idle"
     }
   ],
 

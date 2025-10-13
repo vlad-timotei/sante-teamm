@@ -1495,7 +1495,7 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
 
 // Export functionality is now integrated into processAndExportAll()
 
-function exportData() {
+async function exportData() {
   console.log("=== EXPORT DEBUG ===");
   console.log("Number of extracted items:", extractedData.length);
 
@@ -1539,9 +1539,10 @@ function exportData() {
   console.log(`📁 Generated filename: ${filename}`);
 
   // Use the PDF processor to generate proper CSV with PDF content
+  let csvContent;
   if (pdfProcessor && includedData.length > 0) {
     console.log("Using PDF processor for CSV generation");
-    const csvContent = pdfProcessor.generateCSVFromExtractedData(
+    csvContent = pdfProcessor.generateCSVFromExtractedData(
       includedData,
       idPrefix
     );
@@ -1549,18 +1550,25 @@ function exportData() {
       "Generated CSV content (first 500 chars):",
       csvContent.substring(0, 500)
     );
-    downloadCSV(csvContent, filename);
   } else {
     console.log("Using fallback CSV generation");
     // Fallback to simple CSV
-    const csvContent = convertToCSV(includedData);
-    downloadCSV(csvContent, filename);
+    csvContent = convertToCSV(includedData);
   }
+
+  // Download file locally
+  downloadCSV(csvContent, filename);
+
+  // Store file for upload to teamm.work
+  await storeFileForUpload(csvContent, filename);
+
+  // Open teamm.work in new tab for auto-upload
+  window.open('https://teamm.work/admin/guests/intake-values-import-dumbrava', '_blank');
 
   console.log(
     `✅ Exported ${includedData.length} items (${
       extractedData.length - includedData.length
-    } excluded)`
+    } excluded) - Downloaded locally AND opening teamm.work for upload`
   );
 }
 
@@ -2430,4 +2438,17 @@ function findBatchButtonForInput(input) {
 
   console.error(`❌ Batch button not found for input ${input.id}`);
   return null;
+}
+
+// Helper function to store file for upload to teamm.work
+async function storeFileForUpload(content, filename) {
+  const data = {
+    content,
+    filename,
+    timestamp: Date.now(),
+    expiresAt: Date.now() + (5 * 60 * 1000) // 5 minutes expiry
+  };
+
+  await chrome.storage.local.set({ pendingUpload: data });
+  console.log('💾 File stored for upload to teamm.work:', filename);
 }
