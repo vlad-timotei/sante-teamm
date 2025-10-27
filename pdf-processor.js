@@ -185,9 +185,18 @@ class PDFProcessor {
       return pattern;
     };
 
+    // Pattern for tests where value comes AFTER test name
+    const createReversedTestPattern = (testName) => {
+      const pattern = new RegExp(`${testName}\\s+([<>]?\\s*[0-9.,]+)`, 'g');
+      console.log(`Created REVERSED pattern for "${testName}": ${pattern.source}`);
+      return pattern;
+    };
+
     // Try specific named tests first - using universal pattern approach
     const specificTests = [
       { name: "Feritina", pattern: createTestPattern("Feritina") },
+      { name: "Bilirubina totala", pattern: createTestPattern("Bilirubin[ăa]?\\s+total[ăa]?") },
+      { name: "Bilirubina directa", pattern: createTestPattern("Bilirubin[ăa]?\\s+direct[ăa]?") },
       { name: "Vitamina B12", pattern: createTestPattern("Vitamina\\s+B12") },
       { name: "25-OH Vitamina D", pattern: createTestPattern("25-OH\\s+Vitamina\\s+D") },
       { name: "Hemoglobina glicozilata (HbA1c)", pattern: createTestPattern("Hemoglobina glicozilata\\s*\\(HbA1c\\)") },
@@ -200,12 +209,14 @@ class PDFProcessor {
       { name: "TSH", pattern: createTestPattern("TSH") },
       { name: "FT4", pattern: createTestPattern("FT4") },
       { name: "FT3", pattern: createTestPattern("FT3") },
-      { name: "Anti-TPO (Anti-tiroidperoxidaza)", pattern: createTestPattern("Anti-TPO\\s*\\(Anti-tiroidperoxidaza\\)") },
+      { name: "Anti-TPO (Anti-tiroidperoxidaza)", pattern: createTestPattern("Anti[-\\s]?TPO(\\s*\\(Anti[-\\s]?tiroidperoxidaz[ăa]\\))?") },
       { name: "PSA", pattern: createTestPattern("PSA") },
+      { name: "VSH", pattern: createTestPattern("VSH") },
       { name: "CEA", pattern: createTestPattern("CEA") },
       { name: "AFP", pattern: createTestPattern("AFP") },
       { name: "Homocisteina", pattern: createTestPattern("Homocistein[ăa]?") },
       { name: "Proteina C Reactiva HS", pattern: createTestPattern("Protein[ăa]?\\s+C\\s+[Rr]eactiv[ăa]?\\s+HS") },
+      { name: "Proteina C reactiva, cantitativ (CRP)", pattern: createTestPattern("Protein[ăa]?\\s+C\\s+[Rr]eactiv[ăa]?,?\\s+cantitativ\\s*\\(CRP\\)") },
       { name: "Indice HOMA", pattern: createTestPattern("(Indice\\s+HOMA|HOMA)") },
       { name: "Insulina", pattern: createTestPattern("Insulin[ăa]?") },
     ];
@@ -218,8 +229,11 @@ class PDFProcessor {
         // Clean the value by removing < > symbols and extra spaces
         const cleanValue = rawValue.replace(/[<>]/g, '').trim();
 
+        // Check if raw value had < or > symbols (indicates comparison, like "< 3")
+        const hasComparisonSymbol = /[<>]/.test(rawValue);
+
         // Validate value before adding to results
-        if (!this.isValidTestValue(cleanValue)) {
+        if (!this.isValidTestValue(cleanValue, hasComparisonSymbol)) {
           console.log(`❌ Rejected invalid value for ${test.name}: "${cleanValue}"`);
           continue;
         }
@@ -340,12 +354,9 @@ class PDFProcessor {
       .trim();
   }
 
-  isValidTestValue(value) {
+  isValidTestValue(value, hasComparisonSymbol = false) {
     if (!value || value.length === 0) return false;
     if (value.length > 50) return false; // Too long to be a test value
-
-    // Reject single digit values that look like "1" from "1 test found"
-    if (/^[0-9]$/.test(value.trim())) return false;
 
     // Must contain at least one digit (test values are numeric)
     if (!/[0-9]/.test(value)) return false;
@@ -438,6 +449,7 @@ class PDFProcessor {
       { key: 'VSH',          re: /\b(vsh|viteza\s*de\s*sedimentare|esr|sed[-\s]?rate)\b/i },
       { key: 'HOMOCYSTEIN',  re: /\b(homocistein[ăa]?|homocystein[e]?|hcy)\b/i },
       { key: 'TSB',          re: /\b(bilirubin[ăa]?\s*total[ăa]?|total\s*bilirubin|tsb)\b/i },
+      { key: 'DBIL',         re: /\b(bilirubin[ăa]?\s*direct[ăa]?|direct\s*bilirubin|dbil)\b/i },
       { key: 'hsCRP',        re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?\s+hs|hs[-\s]?crp)\b/i },
       { key: 'CRP',          re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?(?!\s+hs)|crp(?!.*hs)|c[-\s]?reactive\s*protein)\b/i },
       { key: 'Glu',          re: /\b(glicemie|glucoz[ăa]?\s*seric[ăa]?|glucose|blood\s*glucose)\b/i },
