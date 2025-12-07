@@ -1683,6 +1683,10 @@ function displayTestResults(testResultCell, extractedData) {
     "INS",
     "INR",
     "APTT",
+    "d-dimeri",
+    "na",
+    "estradiol",
+    "prolactin",
   ];
   // Nice display labels for table
   const DISPLAY = {
@@ -1717,6 +1721,10 @@ function displayTestResults(testResultCell, extractedData) {
     INS: "Insulina",
     INR: "INR",
     APTT: "APTT",
+    "d-dimeri": "D-Dimeri",
+    na: "Sodiu seric",
+    estradiol: "Estradiol",
+    prolactin: "Prolactina",
   };
   knownItems.sort((a, b) => {
     const ai = ORDER.indexOf(a.key);
@@ -2318,6 +2326,8 @@ async function exportData() {
   );
 
   // Open teamm.work in new tab for auto-upload
+  // Add delay to ensure chrome.storage.local write has propagated before new tab reads it
+  await new Promise(resolve => setTimeout(resolve, 500));
   window.open(
     "https://teamm.work/admin/guests/intake-values-import-dumbrava",
     "_blank"

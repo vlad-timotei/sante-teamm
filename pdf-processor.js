@@ -230,6 +230,10 @@ class PDFProcessor {
       { name: "APTT", pattern: createTestPattern("APTT") },
       { name: "Indice HOMA", pattern: createTestPattern("(Indice\\s+HOMA|HOMA)") },
       { name: "Insulina", pattern: createTestPattern("Insulin[ăa]?") },
+      { name: "D-Dimeri", pattern: createTestPattern("D[\\s-]?Dimer[i]?") },
+      { name: "Sodiu seric", pattern: createTestPattern("Sodiu(\\s+seric)?") },
+      { name: "Estradiol", pattern: createTestPattern("Estradiol") },
+      { name: "Prolactina", pattern: createTestPattern("Prolactin[ăa]?") },
     ];
 
     specificTests.forEach((test) => {
@@ -358,7 +362,9 @@ class PDFProcessor {
       "Parathormon",
       "Anticorpi",
       "HCV",
-      "HBs"
+      "HBs",
+      "Estradiol",
+      "Prolactina"
     ];
 
     const hasValidTerm = validMedicalTerms.some(term =>
@@ -492,6 +498,10 @@ class PDFProcessor {
       { key: 'INS',          re: /\b(insulin[ăa]?|insulin)\b/i },
       { key: 'INR',          re: /\b(inr|international\s*normalized\s*ratio)\b/i },
       { key: 'APTT',         re: /\b(aptt|timpul\s*de\s*tromboplastin[ăa]?\s*partial\s*activat|activated\s*partial\s*thromboplastin\s*time)\b/i },
+      { key: 'd-dimeri',     re: /\b(d[\s-]?dimer[i]?)\b/i },
+      { key: 'na',           re: /\b(sodiu(\s+seric)?|natriu)\b/i },
+      { key: 'estradiol',    re: /\b(estradiol|e2)\b/i },
+      { key: 'prolactin',   re: /\b(prolactin[ăa]?|prl)\b/i },
     ];
 
     for (const { key, re } of TEST_KEY_MAP) {
