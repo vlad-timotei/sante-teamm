@@ -192,55 +192,12 @@ class PDFProcessor {
       return pattern;
     };
 
-    // Try specific named tests first - using universal pattern approach
-    const specificTests = [
-      { name: "Feritina", pattern: createTestPattern("Feritina") },
-      { name: "Bilirubina totala", pattern: createTestPattern("Bilirubin[ăa]?\\s+total[ăa]?") },
-      { name: "Bilirubina directa", pattern: createTestPattern("Bilirubin[ăa]?\\s+direct[ăa]?") },
-      { name: "Bilirubina indirecta", pattern: createTestPattern("Bilirubin[ăa]?\\s+indirect[ăa]?") },
-      { name: "Vitamina B12", pattern: createTestPattern("Vitamina\\s+B12") },
-      { name: "25-OH Vitamina D", pattern: createTestPattern("25-OH\\s+Vitamina\\s+D") },
-      { name: "Hemoglobina glicozilata (HbA1c)", pattern: createTestPattern("Hemoglobina glicozilata\\s*\\(HbA1c\\)") },
-      { name: "Cortizol", pattern: createTestPattern("Cortizol") },
-      { name: "Magneziu seric", pattern: createTestPattern("Magneziu seric") },
-      { name: "Calciu seric total", pattern: createTestPattern("Calciu seric total") },
-      { name: "Potasiu seric", pattern: createTestPattern("Potasiu seric") },
-      { name: "Sideremie", pattern: createTestPattern("Sideremie") },
-      { name: "Colesterol total", pattern: createTestPattern("Colesterol total") },
-      { name: "Trigliceride", pattern: createTestPattern("Trigliceride") },
-      { name: "Glicemie", pattern: createTestPattern("(Glicemie|Glucoz[ăa]\\s+seric[ăa]?)") },
-      { name: "TSH", pattern: createTestPattern("TSH") },
-      { name: "FT4", pattern: createTestPattern("FT4") },
-      { name: "FT3", pattern: createTestPattern("FT3") },
-      { name: "Calcitonina", pattern: createTestPattern("Calcitonin[ăa]?") },
-      { name: "Intact PTH (Parathormon)", pattern: createTestPattern("Intact\\s+PTH(\\s*\\(Parathormon\\))?") },
-      { name: "Anti-TPO (Anti-tiroidperoxidaza)", pattern: createTestPattern("Anti[-\\s]?TPO(\\s*\\(Anti[-\\s]?tiroidperoxidaz[ăa]\\))?") },
-      { name: "Anticorpi anti-HCV", pattern: createTestPattern("Anticorpi\\s+anti[-\\s]?HCV") },
-      { name: "Antigen HBs", pattern: createTestPattern("Antigen\\s+HBs") },
-      { name: "PSA", pattern: createTestPattern("PSA") },
-      { name: "VSH", pattern: createTestPattern("VSH") },
-      { name: "CEA", pattern: createTestPattern("CEA") },
-      { name: "CA 19-9", pattern: createTestPattern("CA\\s*19[-\\s]?9") },
-      { name: "CA 125", pattern: createTestPattern("CA\\s*125") },
-      { name: "AFP", pattern: createTestPattern("AFP") },
-      { name: "Homocisteina", pattern: createTestPattern("Homocistein[ăa]?") },
-      { name: "Proteina C Reactiva HS", pattern: createTestPattern("Protein[ăa]?\\s+C\\s+[Rr]eactiv[ăa]?\\s+HS") },
-      { name: "Proteina C reactiva, cantitativ (CRP)", pattern: createTestPattern("Protein[ăa]?\\s+C\\s+[Rr]eactiv[ăa]?,?\\s+cantitativ\\s*\\(CRP\\)") },
-      { name: "INR", pattern: createTestPattern("INR") },
-      { name: "APTT", pattern: createTestPattern("APTT") },
-      { name: "Indice HOMA", pattern: createTestPattern("(Indice\\s+HOMA|HOMA)") },
-      { name: "Insulina", pattern: createTestPattern("Insulin[ăa]?") },
-      { name: "D-Dimeri", pattern: createTestPattern("D[\\s-]?Dimer[i]?") },
-      { name: "Sodiu seric", pattern: createTestPattern("Sodiu(\\s+seric)?") },
-      { name: "Estradiol", pattern: createTestPattern("Estradiol") },
-      { name: "Prolactina", pattern: createTestPattern("Prolactin[ăa]?") },
-      { name: "Peptid C", pattern: createTestPattern("Peptid(ul)?\\s*C") },
-    ];
-
-    specificTests.forEach((test) => {
-      console.log(`Looking for ${test.name} with pattern: ${test.pattern.source}`);
+    // Use TEST_DEFINITIONS from test-config.js (single source of truth)
+    TEST_DEFINITIONS.forEach((test) => {
+      const pattern = createTestPattern(test.pattern);
+      console.log(`Looking for ${test.name} with pattern: ${pattern.source}`);
       let match;
-      while ((match = test.pattern.exec(text)) !== null) {
+      while ((match = pattern.exec(text)) !== null) {
         const rawValue = match[1];
         // Clean the value by removing < > symbols and extra spaces
         const cleanValue = rawValue.replace(/[<>]/g, '').trim();
@@ -254,11 +211,12 @@ class PDFProcessor {
           continue;
         }
 
-        structuredData.testResults[test.name] = {
+        // Store by key directly (no mapping needed later)
+        structuredData.testResults[test.key] = {
           value: cleanValue,
         };
         totalMatches++;
-        console.log(`✅ Found ${test.name}: ${cleanValue} (raw: ${rawValue})`);
+        console.log(`✅ Found ${test.key}: ${cleanValue} (raw: ${rawValue})`);
       }
     });
 
@@ -413,26 +371,23 @@ class PDFProcessor {
       // Concatenate ID prefix with patient text
       const fullId = idPrefix + patientText;
 
-      // Extract all test results
+      // Extract all test results (already stored by key)
       if (data.structuredData?.testResults) {
         const seenKeys = new Set();
-        Object.entries(data.structuredData.testResults).forEach(([testName, testData]) => {
-          const mappedKey = this.mapTestNameToKey(testName);
-          // Only include mapped target keys and avoid duplicates per patient
-          if (!mappedKey) return;
-          if (seenKeys.has(mappedKey)) return;
-          seenKeys.add(mappedKey);
+        Object.entries(data.structuredData.testResults).forEach(([key, testData]) => {
+          // Avoid duplicates per patient
+          if (seenKeys.has(key)) return;
+          seenKeys.add(key);
 
           const requestId = `${fullId}-${patientName}`;
           const row = [
             this.escapeCsvValue(requestId),
             this.escapeCsvValue(procDate),
-            this.escapeCsvValue(mappedKey),
+            this.escapeCsvValue(key),
             this.escapeCsvValue(testData.value || ""),
           ];
           csvRows.push(row.join(","));
         });
-
       }
     });
 
@@ -460,60 +415,6 @@ class PDFProcessor {
     return `${m}/${d}/${yyyy} ${hh}:${mm}:${ss}`;
   }
 
-  // Map raw test labels to target keys required for final docs
-  // Target keys: B12, 25OHD, TSH, FT4, ATPO, HBA1C, FERITINA, IRON, PSA, VSH, HOMOCYSTEIN, TSB, CRP, hsCRP, Glu, HOMA, INS
-  mapTestNameToKey(rawName) {
-    const name = String(rawName || '').trim();
-    if (!name) return null;
-
-    // Common Romanian/English variants mapped to your exact keys
-    const TEST_KEY_MAP = [
-      { key: 'B12',          re: /\b(vitamina\s*b\s*12|vitamina\s*b12|b12|cobalamin)\b/i },
-      { key: '25OHD',        re: /\b(25\s*[-\s\(]?oh[)\s]*\s*vitamina\s*d|25\s*[-\s]?oh\s*vitamin\s*d|vitamin\s*d.*25\s*[-\s]?oh|25[-\s]?hydroxy.*vitamin\s*d|25ohd)\b/i },
-      { key: 'TSH',          re: /\b(tsh|thyroid\s*stimulating\s*hormone)\b/i },
-      { key: 'FT4',          re: /\b(ft4|free\s*t4|thyroxine\s*liber[ăa]?|t4\s*liber)\b/i },
-      { key: 'FT3',          re: /\b(ft3|free\s*t3|triiodotironin[ăa]?\s*liber[ăa]?|t3\s*liber)\b/i },
-      { key: 'CALCITONIN',   re: /\b(calcitonin[ăa]?|calcitonin)\b/i },
-      { key: 'PTH',          re: /\b(intact\s*pth|parathormon|parathyroid\s*hormone|pth)\b/i },
-      { key: 'ATPO',         re: /\b(anti[-\s]?tpo|anti[-\s]?tiroidperoxidaz[ăa]|anti[-\s]?thyroid[-\s]?peroxidase|tpo\s*ab|tpoab)\b/i },
-      { key: 'ACHCV',        re: /\b(anticorpi\s*anti[-\s]?hcv|anti[-\s]?hcv|hcv\s*antibod(?:y|ies))\b/i },
-      { key: 'AGHBS',        re: /\b(antigen\s*hbs|hbs\s*antigen|hbsag)\b/i },
-      { key: 'HBA1C',        re: /\b(hba1c|hemoglobin[ăa]?\s*glicozilat[ăa]?|hemoglobina\s*glicozilat[ăa]?|glycated\s*ha?emoglobin|a1c)\b/i },
-      { key: 'FERITINA',     re: /\b(feritin[ăa]?|ferritin)\b/i },
-      { key: 'MG',           re: /\b(magneziu\s*seric|serum\s*magnesium|magnesium)\b/i },
-      { key: 'CA',           re: /\b(calciu\s*seric\s*total|total\s*serum\s*calcium|calcium)\b/i },
-      { key: 'K',            re: /\b(potasiu\s*seric|serum\s*potassium|potassium)\b/i },
-      { key: 'IRON',         re: /\b(sideremie|serum\s*iron|\bfe\b|iron)\b/i },
-      { key: 'PSA',          re: /\b(psa|prostate[-\s]?specific\s*antigen)\b/i },
-      { key: 'CA199',        re: /\b(ca\s*19[-\s]?9|ca199)\b/i },
-      { key: 'CA125',        re: /\b(ca\s*125|ca125)\b/i },
-      { key: 'VSH',          re: /\b(vsh|viteza\s*de\s*sedimentare|esr|sed[-\s]?rate)\b/i },
-      { key: 'HOMOCYSTEIN',  re: /\b(homocistein[ăa]?|homocystein[e]?|hcy)\b/i },
-      { key: 'TSB',          re: /\b(bilirubin[ăa]?\s*total[ăa]?|total\s*bilirubin|tsb)\b/i },
-      { key: 'DBIL',         re: /\b(bilirubin[ăa]?\s*direct[ăa]?|direct\s*bilirubin|dbil)\b/i },
-      { key: 'IBIL',         re: /\b(bilirubin[ăa]?\s*indirect[ăa]?|indirect\s*bilirubin|ibil)\b/i },
-      { key: 'hsCRP',        re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?\s+hs|hs[-\s]?crp)\b/i },
-      { key: 'CRP',          re: /\b(protein[ăa]?\s*c\s*reactiv[ăa]?(?!\s+hs)|crp(?!.*hs)|c[-\s]?reactive\s*protein)\b/i },
-      { key: 'Glu',          re: /\b(glicemie|glucoz[ăa]?\s*seric[ăa]?|glucose|blood\s*glucose)\b/i },
-      { key: 'HOMA',         re: /\b(indice\s+homa|homa(?!\s*insulin))\b/i },
-      { key: 'INS',          re: /\b(insulin[ăa]?|insulin)\b/i },
-      { key: 'INR',          re: /\b(inr|international\s*normalized\s*ratio)\b/i },
-      { key: 'APTT',         re: /\b(aptt|timpul\s*de\s*tromboplastin[ăa]?\s*partial\s*activat|activated\s*partial\s*thromboplastin\s*time)\b/i },
-      { key: 'd-dimeri',     re: /\b(d[\s-]?dimer[i]?)\b/i },
-      { key: 'na',           re: /\b(sodiu(\s+seric)?|natriu)\b/i },
-      { key: 'estradiol',    re: /\b(estradiol|e2)\b/i },
-      { key: 'prolactin',   re: /\b(prolactin[ăa]?|prl)\b/i },
-      { key: 'peptid-c',    re: /\b(peptid(ul)?\s*c|c[-\s]?peptid[e]?)\b/i },
-    ];
-
-    for (const { key, re } of TEST_KEY_MAP) {
-      if (re.test(name)) return key;
-    }
-    return null;
-  }
-
-  // Removed code ID mapping per request; AnCode uses canonical key
-
   validateExportCompleteness(extractedDataArray, generatedCSV) {
     // Returns array of patients with missing data
     const issues = [];
@@ -523,10 +424,8 @@ class PDFProcessor {
                          data.patientInfo?.nume || "Unknown";
       const testResults = data.structuredData?.testResults || {};
 
-      // Count only MAPPED tests (tests that should be exported)
-      const mappedTestCount = Object.keys(testResults).filter(testName => {
-        return this.mapTestNameToKey(testName) !== null;
-      }).length;
+      // All tests in testResults are already keyed (no mapping needed)
+      const testCount = Object.keys(testResults).length;
 
       const patientText = data.patientInfo?.patientText || '';
 
@@ -535,11 +434,11 @@ class PDFProcessor {
         row.includes(patientText) && row.includes(patientName)
       ).length;
 
-      // Only warn if patient has MAPPED tests that are missing from export
-      if (mappedTestCount > 0 && csvRows === 0) {
+      // Warn if patient has tests that are missing from export
+      if (testCount > 0 && csvRows === 0) {
         issues.push({
           patient: patientName,
-          extractedTests: mappedTestCount,
+          extractedTests: testCount,
           exportedRows: csvRows
         });
       }

@@ -1614,142 +1614,43 @@ function displayTestResults(testResultCell, extractedData) {
 
   const testResults = extractedData.structuredData?.testResults || {};
 
-  // Separate tests into mapped (will be exported) and unmapped (won't be exported)
-  const knownItems = [];
-  const otherItems = [];
+  // Build items from test results (already keyed by export key)
+  const knownItems = Object.entries(testResults).map(([key, testData]) => ({
+    key,
+    value: testData.value || "N/A",
+  }));
 
-  Object.entries(testResults).forEach(([testName, testData]) => {
-    const value = testData.value || "N/A";
-    let mapped = null;
-    try {
-      if (pdfProcessor && typeof pdfProcessor.mapTestNameToKey === "function") {
-        mapped = pdfProcessor.mapTestNameToKey(testName);
-      }
-    } catch (e) {}
+  const testCount = knownItems.length;
 
-    if (mapped) {
-      knownItems.push({ key: mapped, value });
-    } else {
-      otherItems.push(`${testName}: ${value}`);
-    }
-  });
-
-  // Count only mapped tests (tests that will actually be exported)
-  const mappedTestCount = knownItems.length;
-
-  if (mappedTestCount === 0 && otherItems.length === 0) {
+  if (testCount === 0) {
     testResultCell.innerHTML = `
   <span style="color: #ffc107;">⚠️ No tests found</span>
 `;
     return;
   }
 
-  // Show count of mapped tests only (tests that will be exported to CSV)
-  let testsHtml =
-    mappedTestCount > 0
-      ? `<div style="color: #28a745; font-weight: bold;">${mappedTestCount} analiză(e):</div>`
-      : `<div style="color: #ff9800; font-weight: bold;">⚠️ Nicio analiză.</div>`;
+  // Show count of tests
+  let testsHtml = `<div style="color: #28a745; font-weight: bold;">${testCount} analiză(e):</div>`;
 
-  // Sort known mapped items in a consistent order
-  const ORDER = [
-    "B12",
-    "25OHD",
-    "TSH",
-    "FT4",
-    "FT3",
-    "CALCITONIN",
-    "PTH",
-    "ATPO",
-    "ACHCV",
-    "AGHBS",
-    "HBA1C",
-    "FERITINA",
-    "MG",
-    "CA",
-    "K",
-    "IRON",
-    "PSA",
-    "CA199",
-    "CA125",
-    "VSH",
-    "HOMOCYSTEIN",
-    "TSB",
-    "DBIL",
-    "IBIL",
-    "CRP",
-    "hsCRP",
-    "Glu",
-    "HOMA",
-    "INS",
-    "INR",
-    "APTT",
-    "d-dimeri",
-    "na",
-    "estradiol",
-    "prolactin",
-    "peptid-c",
-  ];
-  // Nice display labels for table
-  const DISPLAY = {
-    B12: "Vitamina B12",
-    "25OHD": "25-OH Vitamina D",
-    TSH: "TSH",
-    FT4: "FT4",
-    FT3: "FT3 (Triiodotironina liberă)",
-    CALCITONIN: "Calcitonina",
-    PTH: "Intact PTH (Parathormon)",
-    ATPO: "Anti-TPO (Anti-tiroidperoxidaza)",
-    ACHCV: "Anticorpi anti-HCV",
-    AGHBS: "Antigen HBs",
-    HBA1C: "Hemoglobina glicozilata (HbA1c)",
-    FERITINA: "Feritina",
-    MG: "Magneziu seric",
-    CA: "Calciu seric total",
-    K: "Potasiu seric",
-    IRON: "Sideremie",
-    PSA: "PSA",
-    CA199: "CA 19-9",
-    CA125: "CA 125",
-    VSH: "VSH",
-    HOMOCYSTEIN: "Homocisteina",
-    TSB: "Bilirubina totală",
-    DBIL: "Bilirubina directă",
-    IBIL: "Bilirubina indirectă",
-    CRP: "CRP (Proteina C reactivă)",
-    hsCRP: "Proteina C Reactiva HS (High Sensitive)",
-    Glu: "Glicemie (Glucoză serică)",
-    HOMA: "Indice HOMA (Rezistență la insulină)",
-    INS: "Insulina",
-    INR: "INR",
-    APTT: "APTT",
-    "d-dimeri": "D-Dimeri",
-    na: "Sodiu seric",
-    estradiol: "Estradiol",
-    prolactin: "Prolactina",
-    "peptid-c": "Peptid C",
-  };
+  // Generate ORDER and DISPLAY from TEST_DEFINITIONS (single source of truth)
+  const ORDER = TEST_DEFINITIONS.map(t => t.key);
+  const DISPLAY = Object.fromEntries(TEST_DEFINITIONS.map(t => [t.key, t.name]));
+
   knownItems.sort((a, b) => {
     const ai = ORDER.indexOf(a.key);
     const bi = ORDER.indexOf(b.key);
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
   });
 
-  // Render known mapped items with nice names
+  // Render items with nice names
   knownItems.forEach(({ key, value }) => {
     const label = DISPLAY[key] || key;
     testsHtml += `<div style="margin: 2px 0;">• ${label}: <strong>${value}</strong></div>`;
   });
 
-  // Visual-only summary for unmapped tests
-  if (otherItems.length > 0) {
-    testsHtml += `<div style="margin: 4px 0; color: #555;">Other tests: ${otherItems.join(
-      "; "
-    )}</div>`;
-  }
-
   testResultCell.innerHTML = exportedBadge + testsHtml;
   testResultCell.style.color = "#000";
-  testResultCell.title = `Full test results for this patient (${mappedTestCount} mapped, ${otherItems.length} unmapped).`;
+  testResultCell.title = `Full test results for this patient (${testCount} tests).`;
 }
 
 function updateTestResultsColumn(elementIndex, extractedData) {

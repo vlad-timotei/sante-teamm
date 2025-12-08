@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "matches": ["*://rezultateptmedici.clinica-sante.ro/*"],
-      "js": ["pdf.min.js", "pdf-processor.js", "content.js"],
+      "js": ["pdf.min.js", "test-config.js", "pdf-processor.js", "content.js"],
       "run_at": "document_end"
     },
     {
