@@ -1687,6 +1687,7 @@ function displayTestResults(testResultCell, extractedData) {
     "na",
     "estradiol",
     "prolactin",
+    "peptid-c",
   ];
   // Nice display labels for table
   const DISPLAY = {
@@ -1725,6 +1726,7 @@ function displayTestResults(testResultCell, extractedData) {
     na: "Sodiu seric",
     estradiol: "Estradiol",
     prolactin: "Prolactina",
+    "peptid-c": "Peptid C",
   };
   knownItems.sort((a, b) => {
     const ai = ORDER.indexOf(a.key);

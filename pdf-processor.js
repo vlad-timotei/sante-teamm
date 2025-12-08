@@ -234,6 +234,7 @@ class PDFProcessor {
       { name: "Sodiu seric", pattern: createTestPattern("Sodiu(\\s+seric)?") },
       { name: "Estradiol", pattern: createTestPattern("Estradiol") },
       { name: "Prolactina", pattern: createTestPattern("Prolactin[ăa]?") },
+      { name: "Peptid C", pattern: createTestPattern("Peptid(ul)?\\s*C") },
     ];
 
     specificTests.forEach((test) => {
@@ -502,6 +503,7 @@ class PDFProcessor {
       { key: 'na',           re: /\b(sodiu(\s+seric)?|natriu)\b/i },
       { key: 'estradiol',    re: /\b(estradiol|e2)\b/i },
       { key: 'prolactin',   re: /\b(prolactin[ăa]?|prl)\b/i },
+      { key: 'peptid-c',    re: /\b(peptid(ul)?\s*c|c[-\s]?peptid[e]?)\b/i },
     ];
 
     for (const { key, re } of TEST_KEY_MAP) {
