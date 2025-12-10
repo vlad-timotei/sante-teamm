@@ -33,6 +33,9 @@ async function initializeBatchExtension() {
   pdfProcessor = new PDFProcessor();
   await pdfProcessor.loadPDFJS();
 
+  // Migrate existing patient data to new structure (backward compatible)
+  await migratePatientData();
+
   // Hide the Charisma footer
   hideCharismaFooter();
 
@@ -48,6 +51,16 @@ async function initializeBatchExtension() {
   if (downloadElements.length > 0) {
     injectBatchButtons(downloadElements);
     createSingleProcessButton();
+
+    // Add event delegation for refetch buttons (once)
+    document.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("refetch-btn")) {
+        e.preventDefault();
+        const patientKey = e.target.dataset.patientKey;
+        const row = e.target.closest("tr");
+        await refetchPatientData(patientKey, row);
+      }
+    });
 
     // Sync UI with localStorage (delayed to let table load)
     setTimeout(async () => {
@@ -231,6 +244,7 @@ async function syncUIWithLocalStorage() {
   }
 
   const rows = table.querySelectorAll("tr");
+  let statusChangesDetected = 0;
 
   rows.forEach((row, rowIndex) => {
     const cells = row.querySelectorAll("td");
@@ -272,13 +286,39 @@ async function syncUIWithLocalStorage() {
     }
 
     if (storedPatient) {
+      // Check for status change: stored as "In lucru" or "Rezultate partiale" but page shows "Efectuat cu rezultate"
+      const currentStatusIcon = row.querySelector(".glyphicon");
+      const currentStatus = currentStatusIcon?.getAttribute("title") || "Unknown";
+      const storedStatus = storedPatient.importedStatus || "Unknown";
+
+      // Detect status change from incomplete to complete
+      const incompleteStatuses = ["In lucru", "Rezultate partiale"];
+      if (incompleteStatuses.includes(storedStatus) && currentStatus === "Efectuat cu rezultate") {
+        if (!storedPatient.statusChangedSinceImport) {
+          storedPatient.statusChangedSinceImport = true;
+          statusChangesDetected++;
+          console.log(
+            `🔔 Status changed for ${storedPatient.patientInfo?.nume}: "${storedStatus}" → "${currentStatus}"`
+          );
+        }
+      }
+
+      // Get patient key for displayTestResults
+      const patientKey = getPatientKey(idPrefix, patientName);
+
       if (storedPatient.excluded === false) {
         // In storage, not excluded → green checkmark
         batchBtn.textContent = "✓";
         batchBtn.style.background = "#28a745";
         batchBtn.setAttribute("data-batched", "true");
         row.style.opacity = "1";
-        row.style.backgroundColor = "";
+
+        // Highlight row if status changed
+        if (storedPatient.statusChangedSinceImport) {
+          row.style.backgroundColor = "#fff3cd"; // Amber highlight
+        } else {
+          row.style.backgroundColor = "";
+        }
 
         // Restore test results cell styling and populate with stored data
         const testResultCell = row.querySelector('[id^="test-results-"]');
@@ -294,15 +334,15 @@ async function syncUIWithLocalStorage() {
             excludedIndicator.remove();
           }
 
-          // Populate test results from stored data
-          displayTestResults(testResultCell, storedPatient);
+          // Populate test results from stored data (with patient key for refetch button)
+          displayTestResults(testResultCell, storedPatient, patientKey);
           console.log(
             `📊 Populated test results for ${storedPatient.patientInfo.nume}`
           );
         }
 
         console.log(
-          `✅ Synced UI for ${storedPatient.patientInfo.nume}: not excluded`
+          `✅ Synced UI for ${storedPatient.patientInfo.nume}: not excluded${storedPatient.statusChangedSinceImport ? ' (status changed!)' : ''}`
         );
       } else {
         // In storage, excluded → greyed out
@@ -355,6 +395,18 @@ async function syncUIWithLocalStorage() {
       );
     }
   });
+
+  // Save queue if any status changes were detected
+  if (statusChangesDetected > 0) {
+    await saveQueueToStorage(queue);
+    console.log(`💾 Saved ${statusChangesDetected} status change(s) to storage`);
+
+    // Show notification about status changes
+    showSuccessToast(
+      "🔔 Status Changes Detected",
+      `${statusChangesDetected} patient(s) now have results ready. Click "Refetch" to update their data.`
+    );
+  }
 
   // Update export count based on localStorage
   await updateExportCount();
@@ -725,35 +777,34 @@ async function addToBatch(element, index, batchBtn) {
 
   // Check patient status before processing
   const statusIcon = row.querySelector(".glyphicon");
+  let importedStatus = "Unknown";
   if (statusIcon) {
     const statusTitle = statusIcon.getAttribute("title");
     console.log(`🔍 Checking status for patient: ${statusTitle}`);
 
-    // Block patients with "In lucru" status
-    if (statusTitle === "In lucru") {
+    // Allow "Efectuat cu rezultate", "In lucru", and "Rezultate partiale" statuses
+    if (statusTitle === "Efectuat cu rezultate" || statusTitle === "In lucru" || statusTitle === "Rezultate partiale") {
+      importedStatus = statusTitle;
+
+      if (statusTitle === "In lucru" || statusTitle === "Rezultate partiale") {
+        console.log(
+          `⚠️ Patient has "${statusTitle}" status - results may be partial. You can refetch later when complete.`
+        );
+      } else {
+        console.log(
+          `✅ STATUS OK: Patient has "${statusTitle}" status - processing allowed`
+        );
+      }
+    } else {
+      // Block other statuses
       alert(
-        `Cannot process patient: Status is "${statusTitle}". Only patients with "Efectuat cu rezultate" status can be processed.`
+        `Cannot process patient: Status is "${statusTitle}". Only patients with "Efectuat cu rezultate", "In lucru", or "Rezultate partiale" status can be processed.`
       );
       console.log(
-        `❌ BLOCKED: Patient has "In lucru" status - processing would fail`
+        `❌ BLOCKED: Patient status "${statusTitle}" - not allowed`
       );
       return;
     }
-
-    // Only allow patients with "Efectuat cu rezultate" status
-    if (statusTitle !== "Efectuat cu rezultate") {
-      alert(
-        `Cannot process patient: Status is "${statusTitle}". Only patients with "Efectuat cu rezultate" status can be processed.`
-      );
-      console.log(
-        `❌ BLOCKED: Patient status "${statusTitle}" - only "Efectuat cu rezultate" allowed`
-      );
-      return;
-    }
-
-    console.log(
-      `✅ STATUS OK: Patient has "${statusTitle}" status - processing allowed`
-    );
   } else {
     console.warn(
       `⚠️ No status icon found for patient - proceeding with caution`
@@ -778,6 +829,7 @@ async function addToBatch(element, index, batchBtn) {
     dataRezultate: cells[7]?.textContent.trim(),
     patientText: patientText, // Store the patient-specific text
     idPrefix: idPrefix, // Store the ID prefix
+    importedStatus: importedStatus, // Store status at import time for refetch tracking
   };
 
   const patientName = patientData.nume.trim();
@@ -825,7 +877,7 @@ async function addToBatch(element, index, batchBtn) {
 
     // Populate test results from stored data
     if (testResultCell) {
-      displayTestResults(testResultCell, existingPatient);
+      displayTestResults(testResultCell, existingPatient, patientKey);
       console.log(`📊 Refreshed test results for ${patientData.nume}`);
     }
 
@@ -1307,10 +1359,19 @@ function updateBatchCount(count) {
 async function updateExportCount() {
   // Load from localStorage (not current page's extractedData)
   const queue = await loadQueueFromStorage();
-  // Count only patients that are not excluded AND not exported yet
-  const exportCount = queue.filter(
-    (p) => p.excluded === false && p.exported === false
-  ).length;
+
+  // Count patients with unexported tests (per-test tracking)
+  const patientsWithUnexportedTests = queue.filter((p) => {
+    if (p.excluded === true) return false;
+
+    const testResults = p.structuredData?.testResults || {};
+    const exportedTests = p.exportedTests || {};
+
+    // Check if any test hasn't been exported
+    return Object.keys(testResults).some((key) => !exportedTests[key]);
+  });
+
+  const exportCount = patientsWithUnexportedTests.length;
 
   const countElement = document.getElementById("exported-count");
   const exportButton = document.getElementById("sante-process-export");
@@ -1321,14 +1382,14 @@ async function updateExportCount() {
 
   if (exportButton) {
     if (exportCount > 0) {
-      // Enable button when localStorage has non-excluded patients
+      // Enable button when localStorage has patients with unexported tests
       exportButton.disabled = false;
       exportButton.style.background = "#007cba";
       exportButton.style.borderColor = "#007cba";
       exportButton.style.cursor = "pointer";
       exportButton.style.opacity = "1";
     } else {
-      // Disable button when no exportable patients
+      // Disable button when no exportable tests
       exportButton.disabled = true;
       exportButton.style.background = "#6c757d";
       exportButton.style.borderColor = "#6c757d";
@@ -1376,8 +1437,8 @@ async function updateDownloadCount() {
 
     if (statusIcon) {
       const statusTitle = statusIcon.getAttribute("title");
-      // Only count patients with ready status
-      if (statusTitle !== "Efectuat cu rezultate") return false;
+      // Count patients with ready, in-progress, or partial results status
+      if (statusTitle !== "Efectuat cu rezultate" && statusTitle !== "In lucru" && statusTitle !== "Rezultate partiale") return false;
     } else {
       return false;
     }
@@ -1451,20 +1512,23 @@ async function analyzeCurrentPage() {
       if (statusIcon) {
         const statusTitle = statusIcon.getAttribute("title");
 
-        // Skip patients with non-ready status
-        if (
-          statusTitle === "In lucru" ||
-          statusTitle !== "Efectuat cu rezultate"
-        ) {
+        // Allow "Efectuat cu rezultate", "In lucru", and "Rezultate partiale" statuses
+        if (statusTitle !== "Efectuat cu rezultate" && statusTitle !== "In lucru" && statusTitle !== "Rezultate partiale") {
           console.log(
-            `⏭️ Skipping patient with ID suffix ${idSuffix} - status: "${statusTitle}"`
+            `⏭️ Skipping patient with ID suffix ${idSuffix} - status: "${statusTitle}" (not allowed)`
           );
           return;
         }
 
-        console.log(
-          `✅ Including patient with ID suffix ${idSuffix} - status: "${statusTitle}"`
-        );
+        if (statusTitle === "In lucru" || statusTitle === "Rezultate partiale") {
+          console.log(
+            `⚠️ Including patient with ID suffix ${idSuffix} - status: "${statusTitle}" (partial results)`
+          );
+        } else {
+          console.log(
+            `✅ Including patient with ID suffix ${idSuffix} - status: "${statusTitle}"`
+          );
+        }
       }
 
       // Check if patient already has data in localStorage
@@ -1486,6 +1550,7 @@ async function analyzeCurrentPage() {
           input: input,
           button: batchButton,
           suffix: idSuffix,
+          importedStatus: statusIcon?.getAttribute("title") || "Unknown",
         });
       }
     }
@@ -1571,61 +1636,164 @@ async function analyzeCurrentPage() {
   );
 }
 
-function displayTestResults(testResultCell, extractedData) {
+function displayTestResults(testResultCell, extractedData, patientKey = null) {
   // Format test results for display (helper function - reusable)
   if (!testResultCell) return;
 
-  // Add exported indicator if patient has been exported
+  const testResults = extractedData.structuredData?.testResults || {};
+  const exportedTests = extractedData.exportedTests || {};
+  const totalTests = Object.keys(testResults).length;
+  const exportedCount = Object.keys(testResults).filter((k) => exportedTests[k]).length;
+
+  // Determine if refetch button should be shown
+  const showRefetch =
+    extractedData.statusChangedSinceImport === true ||
+    extractedData.importedStatus === "In lucru" ||
+    extractedData.importedStatus === "Rezultate partiale" ||
+    extractedData.needsReexport === true;
+
+  // Build status change alert if applicable
+  let statusChangeBadge = "";
+  if (extractedData.statusChangedSinceImport) {
+    statusChangeBadge = `
+      <div style="
+        display: block;
+        background: #fff3cd;
+        color: #856404;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+        margin-bottom: 6px;
+        border: 1px solid #ffeeba;
+      ">
+        🔔 Status changed! Results ready to fetch
+      </div>
+    `;
+  }
+
+  // Build refetch button if needed
+  let refetchButton = "";
+  if (showRefetch && patientKey) {
+    const buttonLabel = extractedData.statusChangedSinceImport
+      ? "🔄 Refetch Results"
+      : extractedData.needsReexport
+      ? "🔄 Refetch (new tests available)"
+      : "🔄 Refetch";
+    refetchButton = `
+      <button
+        class="refetch-btn"
+        data-patient-key="${patientKey}"
+        style="
+          background: #17a2b8;
+          color: white;
+          border: none;
+          padding: 4px 10px;
+          border-radius: 3px;
+          font-size: 11px;
+          cursor: pointer;
+          margin-bottom: 6px;
+          display: block;
+        "
+        title="Re-download PDF and update test results"
+      >
+        ${buttonLabel}
+      </button>
+    `;
+  }
+
+  // Build exported badge based on per-test tracking
   let exportedBadge = "";
-  if (extractedData.exported && extractedData.exportedAt) {
-    const exportDate = new Date(extractedData.exportedAt);
-    const formattedDate = exportDate.toLocaleString("ro-RO", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    exportedBadge = `
+  if (exportedCount > 0) {
+    const allExported = exportedCount === totalTests;
+    const exportDate = extractedData.exportedAt
+      ? new Date(extractedData.exportedAt).toLocaleString("ro-RO", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "Unknown";
+
+    if (allExported) {
+      exportedBadge = `
+        <div style="
+          display: inline-block;
+          background: #28a745;
+          color: white;
+          padding: 2px 8px;
+          border-radius: 3px;
+          font-size: 11px;
+          font-weight: bold;
+          margin-bottom: 4px;
+          cursor: help;
+        " title="All ${totalTests} tests exported on: ${exportDate}">
+          ✓ Exported
+        </div>
+      `;
+    } else {
+      exportedBadge = `
+        <div style="
+          display: inline-block;
+          background: #ffc107;
+          color: #212529;
+          padding: 2px 8px;
+          border-radius: 3px;
+          font-size: 11px;
+          font-weight: bold;
+          margin-bottom: 4px;
+          cursor: help;
+        " title="${exportedCount}/${totalTests} tests exported. ${totalTests - exportedCount} test(s) pending export.">
+          ⚡ ${exportedCount}/${totalTests} Exported
+        </div>
+      `;
+    }
+  }
+
+  // Build needs re-export badge
+  let needsReexportBadge = "";
+  if (extractedData.needsReexport && !extractedData.statusChangedSinceImport) {
+    needsReexportBadge = `
       <div style="
         display: inline-block;
-        background: #28a745;
+        background: #17a2b8;
         color: white;
         padding: 2px 8px;
         border-radius: 3px;
         font-size: 11px;
         font-weight: bold;
         margin-bottom: 4px;
-        cursor: help;
-      " title="Exported on: ${formattedDate}">
-        ✓ Exported
+        margin-left: 4px;
+      ">
+        ⚡ New tests
       </div>
     `;
   }
 
   if (extractedData.error) {
     testResultCell.innerHTML =
+      statusChangeBadge +
+      refetchButton +
       exportedBadge +
-      `
-  <span style="color: #dc3545;">❌ Error: ${extractedData.error}</span>
-`;
+      `<span style="color: #dc3545;">❌ Error: ${extractedData.error}</span>`;
     return;
   }
-
-  const testResults = extractedData.structuredData?.testResults || {};
 
   // Build items from test results (already keyed by export key)
   const knownItems = Object.entries(testResults).map(([key, testData]) => ({
     key,
     value: testData.value || "N/A",
+    isExported: !!exportedTests[key],
   }));
 
   const testCount = knownItems.length;
 
   if (testCount === 0) {
-    testResultCell.innerHTML = `
-  <span style="color: #ffc107;">⚠️ No tests found</span>
-`;
+    testResultCell.innerHTML =
+      statusChangeBadge +
+      refetchButton +
+      `<span style="color: #ffc107;">⚠️ No tests found</span>`;
     return;
   }
 
@@ -1633,8 +1801,8 @@ function displayTestResults(testResultCell, extractedData) {
   let testsHtml = `<div style="color: #28a745; font-weight: bold;">${testCount} analiză(e):</div>`;
 
   // Generate ORDER and DISPLAY from TEST_DEFINITIONS (single source of truth)
-  const ORDER = TEST_DEFINITIONS.map(t => t.key);
-  const DISPLAY = Object.fromEntries(TEST_DEFINITIONS.map(t => [t.key, t.name]));
+  const ORDER = TEST_DEFINITIONS.map((t) => t.key);
+  const DISPLAY = Object.fromEntries(TEST_DEFINITIONS.map((t) => [t.key, t.name]));
 
   knownItems.sort((a, b) => {
     const ai = ORDER.indexOf(a.key);
@@ -1642,13 +1810,19 @@ function displayTestResults(testResultCell, extractedData) {
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
   });
 
-  // Render items with nice names
-  knownItems.forEach(({ key, value }) => {
+  // Render items with per-test export indicators
+  knownItems.forEach(({ key, value, isExported }) => {
     const label = DISPLAY[key] || key;
-    testsHtml += `<div style="margin: 2px 0;">• ${label}: <strong>${value}</strong></div>`;
+    const exportIcon = isExported ? "✓" : "○";
+    const style = isExported ? "color: #6c757d;" : "color: #000; font-weight: bold;";
+    const tooltip = isExported ? "Already exported" : "Not yet exported";
+    testsHtml += `<div style="margin: 2px 0; ${style}" title="${tooltip}">
+      <span style="font-size: 10px;">${exportIcon}</span> ${label}: <strong>${value}</strong>
+    </div>`;
   });
 
-  testResultCell.innerHTML = exportedBadge + testsHtml;
+  testResultCell.innerHTML =
+    statusChangeBadge + refetchButton + exportedBadge + needsReexportBadge + testsHtml;
   testResultCell.style.color = "#000";
   testResultCell.title = `Full test results for this patient (${testCount} tests).`;
 }
@@ -1673,11 +1847,141 @@ function updateTestResultsColumn(elementIndex, extractedData) {
     "color: blue; font-weight: bold"
   );
 
+  // Get patient key if possible
+  const idPrefix = document.getElementById("id-prefix")?.value.trim();
+  const patientName = extractedData.patientInfo?.nume;
+  const patientKey = patientName ? getPatientKey(idPrefix, patientName) : null;
+
   // Use helper function to display results
-  displayTestResults(testResultCell, extractedData);
+  displayTestResults(testResultCell, extractedData, patientKey);
 }
 
-async function downloadAndProcessPDF(downloadLink, batchItem) {
+// Refetch patient data when their status has changed or they need updated results
+async function refetchPatientData(patientKey, rowElement) {
+  console.log(`🔄 Starting refetch for patient key: ${patientKey}`);
+
+  if (!patientKey) {
+    showWarningToast("❌ Refetch Failed", "Patient key not found.");
+    return;
+  }
+
+  // Find patient in storage
+  const queue = await loadQueueFromStorage();
+  const existingPatient = queue.find(
+    (p) => getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
+  );
+
+  if (!existingPatient) {
+    showWarningToast("❌ Refetch Failed", "Patient not found in storage.");
+    return;
+  }
+
+  // Find download link in the row
+  const downloadLink = rowElement?.querySelector('a[href*="__doPostBack"]');
+  if (!downloadLink) {
+    showWarningToast("❌ Refetch Failed", "Download link not found.");
+    return;
+  }
+
+  // Store old test results and export tracking
+  const oldTestResults = existingPatient.structuredData?.testResults || {};
+  const oldExportedTests = existingPatient.exportedTests || {};
+  const oldTestCount = Object.keys(oldTestResults).length;
+
+  // Get the test results cell
+  const testResultCell = rowElement?.querySelector('[id^="test-results-"]');
+  if (testResultCell) {
+    testResultCell.innerHTML = '<span style="color: #ffc107;">⏳ Refetching...</span>';
+  }
+
+  try {
+    // Find the row index for the batch item
+    const table = document.getElementById("ctl00_contentMain_dgGrid");
+    const rows = Array.from(table.querySelectorAll("tr"));
+    const rowIndex = rows.indexOf(rowElement);
+
+    // Create batch item for download
+    const batchItem = {
+      id: `refetch_${Date.now()}`,
+      elementId: downloadLink.id,
+      patientData: existingPatient.patientInfo,
+      elementIndex: rowIndex,
+      timestamp: Date.now(),
+    };
+
+    // Download and process PDF (skip UI update - refetch handles its own UI)
+    const newExtractedData = await downloadAndProcessPDF(downloadLink, batchItem, true);
+
+    if (newExtractedData && newExtractedData.structuredData?.testResults) {
+      const newTestResults = newExtractedData.structuredData.testResults;
+
+      // Merge: only ADD new test keys, keep existing values unchanged
+      const mergedTestResults = { ...oldTestResults };
+      let newTestsFound = 0;
+
+      Object.entries(newTestResults).forEach(([key, testData]) => {
+        if (!mergedTestResults[key]) {
+          mergedTestResults[key] = testData;
+          newTestsFound++;
+          console.log(`✨ New test found: ${key} = ${testData.value}`);
+        }
+      });
+
+      // Update patient in queue
+      existingPatient.structuredData = existingPatient.structuredData || {};
+      existingPatient.structuredData.testResults = mergedTestResults;
+      existingPatient.lastRefetchAt = Date.now();
+      existingPatient.exportedTests = oldExportedTests; // Preserve export tracking
+
+      // Get current status from page
+      const statusIcon = rowElement?.querySelector(".glyphicon");
+      if (statusIcon) {
+        existingPatient.importedStatus = statusIcon.getAttribute("title");
+      }
+
+      // Clear status change flag since we just refetched
+      existingPatient.statusChangedSinceImport = false;
+
+      // Mark as needs re-export if new tests found
+      if (newTestsFound > 0) {
+        existingPatient.needsReexport = true;
+        console.log(`📋 Patient marked for re-export (${newTestsFound} new tests found)`);
+      }
+
+      await saveQueueToStorage(queue);
+
+      // Remove amber highlight from row
+      rowElement.style.backgroundColor = "";
+
+      // Update UI
+      displayTestResults(testResultCell, existingPatient, patientKey);
+
+      // Update export count
+      await updateExportCount();
+
+      const message = newTestsFound > 0
+        ? `Found ${newTestsFound} new test(s). Total: ${Object.keys(mergedTestResults).length} tests.`
+        : `No new tests found. Total: ${Object.keys(mergedTestResults).length} tests.`;
+
+      showSuccessToast("🔄 Refetch Complete", message);
+      console.log(`✅ Refetch complete for ${existingPatient.patientInfo?.nume}: ${message}`);
+    } else {
+      // No new data extracted
+      showWarningToast("⚠️ Refetch Warning", "Could not extract test data from PDF.");
+
+      // Restore previous display
+      displayTestResults(testResultCell, existingPatient, patientKey);
+    }
+  } catch (error) {
+    console.error("Refetch failed:", error);
+    showWarningToast("❌ Refetch Failed", error.message);
+
+    // Restore previous display
+    displayTestResults(testResultCell, existingPatient, patientKey);
+  }
+}
+
+async function downloadAndProcessPDF(downloadLink, batchItem, skipUIUpdate = false) {
   const patientName = batchItem.patientData.nume || "Unknown";
 
   return new Promise((resolve, reject) => {
@@ -1909,11 +2213,19 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
             // Add export tracking fields
             extractedPDFData.exported = false;
             extractedPDFData.exportedAt = null;
+            // Add new fields for partial import tracking
+            extractedPDFData.exportedTests = {};
+            extractedPDFData.importedStatus = batchItem.patientData?.importedStatus || "Unknown";
+            extractedPDFData.statusChangedSinceImport = false;
+            extractedPDFData.lastRefetchAt = null;
+            extractedPDFData.needsReexport = false;
 
             extractedData.push(extractedPDFData);
 
-            // Update test results column
-            updateTestResultsColumn(batchItem.elementIndex, extractedPDFData);
+            // Update test results column (skip for refetch - it handles its own UI)
+            if (!skipUIUpdate) {
+              updateTestResultsColumn(batchItem.elementIndex, extractedPDFData);
+            }
 
             // Clean up isolated processor if it was created
             try {
@@ -1947,11 +2259,18 @@ async function downloadAndProcessPDF(downloadLink, batchItem) {
               errorDetails: pdfError.toString(),
               exported: false,
               exportedAt: null,
+              exportedTests: {},
+              importedStatus: batchItem.patientData?.importedStatus || "Unknown",
+              statusChangedSinceImport: false,
+              lastRefetchAt: null,
+              needsReexport: false,
             };
             extractedData.push(errorData);
 
-            // Update test results column with error
-            updateTestResultsColumn(batchItem.elementIndex, errorData);
+            // Update test results column with error (skip for refetch)
+            if (!skipUIUpdate) {
+              updateTestResultsColumn(batchItem.elementIndex, errorData);
+            }
 
             // Clean up isolated processor if it was created
             try {
@@ -2059,12 +2378,28 @@ async function exportData() {
   const allPatients = await getQueueData();
   console.log(`📦 Total patients in localStorage: ${allPatients.length}`);
 
-  // Filter non-excluded AND non-exported patients
-  const patientsToExport = allPatients.filter(
-    (p) => p.excluded === false && p.exported === false
-  );
+  // Filter patients with unexported tests (per-test tracking)
+  const patientsToExport = allPatients.filter((p) => {
+    if (p.excluded === true) return false;
+
+    const testResults = p.structuredData?.testResults || {};
+    const exportedTests = p.exportedTests || {};
+
+    // Check if any test hasn't been exported
+    return Object.keys(testResults).some((key) => !exportedTests[key]);
+  });
+
+  // Count unexported tests
+  let totalUnexportedTests = 0;
+  patientsToExport.forEach((p) => {
+    const testResults = p.structuredData?.testResults || {};
+    const exportedTests = p.exportedTests || {};
+    const unexported = Object.keys(testResults).filter((key) => !exportedTests[key]);
+    totalUnexportedTests += unexported.length;
+  });
+
   console.log(
-    `📊 Patients to export (non-excluded, not exported): ${patientsToExport.length}`
+    `📊 Patients with unexported tests: ${patientsToExport.length} (${totalUnexportedTests} tests)`
   );
   console.log(
     `🚫 Excluded patients: ${
@@ -2072,14 +2407,18 @@ async function exportData() {
     }`
   );
   console.log(
-    `✓ Already exported patients: ${
-      allPatients.filter((p) => p.exported === true).length
+    `✓ Fully exported patients: ${
+      allPatients.filter((p) => {
+        const testResults = p.structuredData?.testResults || {};
+        const exportedTests = p.exportedTests || {};
+        return Object.keys(testResults).every((key) => exportedTests[key]);
+      }).length
     }`
   );
 
-  if (patientsToExport.length === 0) {
+  if (patientsToExport.length === 0 || totalUnexportedTests === 0) {
     showWarningToast(
-      "Nu am ce să export! Toți pacienții au fost deja exportați sau sunt excluși."
+      "Nu am ce să export! Toate testele au fost deja exportate sau pacienții sunt excluși."
     );
     return;
   }
@@ -2120,10 +2459,11 @@ async function exportData() {
   // Use the PDF processor to generate proper CSV with PDF content
   let csvContent;
   if (pdfProcessor && patientsToExport.length > 0) {
-    console.log("Using PDF processor for CSV generation");
+    console.log("Using PDF processor for CSV generation (with per-test filtering)");
     csvContent = pdfProcessor.generateCSVFromExtractedData(
       patientsToExport,
-      idPrefix
+      idPrefix,
+      true // filterExported: only include unexported tests
     );
     console.log(
       "Generated CSV content (first 500 chars):",
@@ -2164,7 +2504,7 @@ async function exportData() {
   // Store file for upload to teamm.work
   await storeFileForUpload(csvContent, filename);
 
-  // Mark all exported patients as exported
+  // Mark individual tests as exported (per-test tracking)
   const exportTimestamp = Date.now();
   const queue = await loadQueueFromStorage();
   const exportedKeys = new Set(
@@ -2173,21 +2513,41 @@ async function exportData() {
     )
   );
 
+  let totalTestsMarked = 0;
   queue.forEach((patient) => {
     const patientKey = getPatientKey(
       patient.patientInfo?.idPrefix,
       patient.patientInfo?.nume
     );
     if (exportedKeys.has(patientKey)) {
+      // Mark individual tests as exported
+      const testResults = patient.structuredData?.testResults || {};
+      patient.exportedTests = patient.exportedTests || {};
+
+      Object.keys(testResults).forEach((testKey) => {
+        if (!patient.exportedTests[testKey]) {
+          patient.exportedTests[testKey] = exportTimestamp;
+          totalTestsMarked++;
+        }
+      });
+
+      // Update legacy fields for backward compatibility
       patient.exported = true;
       patient.exportedAt = exportTimestamp;
+
+      // Clear needs re-export flag
+      patient.needsReexport = false;
     }
   });
 
   await saveQueueToStorage(queue);
   await updateExportCount();
+
+  // Sync UI to show updated export status
+  await syncUIWithLocalStorage();
+
   console.log(
-    `✅ Marked ${patientsToExport.length} patients as exported in localStorage`
+    `✅ Marked ${totalTestsMarked} tests from ${patientsToExport.length} patients as exported`
   );
 
   // Count only patients with exportable tests (mapped tests > 0)
@@ -2687,24 +3047,16 @@ function matchCSVToTablePatients(csvPatients) {
     if (cells.length >= 2) {
       const downloadLink = row.querySelector('a[id*="lnkView"]');
       if (downloadLink) {
-        // Check patient status - only process if "Efectuat cu rezultate"
+        // Check patient status - allow "Efectuat cu rezultate", "In lucru", and "Rezultate partiale"
         const statusIcon = row.querySelector(".glyphicon");
         if (statusIcon) {
           const statusTitle = statusIcon.getAttribute("title");
           console.log(`Row ${rowIndex} status: ${statusTitle}`);
 
-          // Skip patients with "In lucru" status
-          if (statusTitle === "In lucru") {
+          // Allow completed, in-progress, and partial results statuses
+          if (statusTitle !== "Efectuat cu rezultate" && statusTitle !== "In lucru" && statusTitle !== "Rezultate partiale") {
             console.log(
-              `⏭️ Skipping patient in row ${rowIndex} - status is "In lucru"`
-            );
-            return;
-          }
-
-          // Only process patients with "Efectuat cu rezultate" status
-          if (statusTitle !== "Efectuat cu rezultate") {
-            console.log(
-              `⏭️ Skipping patient in row ${rowIndex} - status is not "Efectuat cu rezultate"`
+              `⏭️ Skipping patient in row ${rowIndex} - status "${statusTitle}" not allowed`
             );
             return;
           }
@@ -2714,15 +3066,17 @@ function matchCSVToTablePatients(csvPatients) {
         if (name) {
           // Create unique identifier for each table patient
           const tablePatientId = `${name}_${downloadLink.id}_${rowIndex}`;
+          const statusTitle = statusIcon?.getAttribute("title") || "Unknown";
           tablePatients.push({
             name: name,
             rowIndex: rowIndex,
             downloadLink: downloadLink,
             row: row,
             uniqueId: tablePatientId,
+            importedStatus: statusTitle,
           });
           console.log(
-            `✅ Added patient for processing: ${name} (status: Efectuat cu rezultate)`
+            `✅ Added patient for processing: ${name} (status: ${statusTitle})`
           );
         }
       }
@@ -3198,6 +3552,66 @@ async function resetExportedStatus() {
   } catch (error) {
     console.error("Failed to reset exported status:", error);
     alert("Error resetting exported status. Check console for details.");
+  }
+}
+
+// Migration function to add new fields for partial import tracking
+async function migratePatientData() {
+  const queue = await loadQueueFromStorage();
+  let migrated = 0;
+
+  queue.forEach((patient) => {
+    let needsMigration = false;
+
+    // Add exportedTests tracking
+    if (patient.exportedTests === undefined) {
+      patient.exportedTests = {};
+
+      // If patient was already exported, mark all current tests as exported
+      if (patient.exported && patient.exportedAt) {
+        const testResults = patient.structuredData?.testResults || {};
+        Object.keys(testResults).forEach((key) => {
+          patient.exportedTests[key] = patient.exportedAt;
+        });
+      }
+      needsMigration = true;
+    }
+
+    // Add importedStatus field
+    if (patient.importedStatus === undefined) {
+      // Legacy patients don't have this, default to "Unknown"
+      patient.importedStatus = "Unknown";
+      needsMigration = true;
+    }
+
+    // Add statusChangedSinceImport field
+    if (patient.statusChangedSinceImport === undefined) {
+      patient.statusChangedSinceImport = false;
+      needsMigration = true;
+    }
+
+    // Add lastRefetchAt field
+    if (patient.lastRefetchAt === undefined) {
+      patient.lastRefetchAt = null;
+      needsMigration = true;
+    }
+
+    // Add needsReexport field
+    if (patient.needsReexport === undefined) {
+      patient.needsReexport = false;
+      needsMigration = true;
+    }
+
+    if (needsMigration) {
+      migrated++;
+    }
+  });
+
+  if (migrated > 0) {
+    await saveQueueToStorage(queue);
+    console.log(`📦 Migrated ${migrated} patients to new data structure`);
+  } else {
+    console.log("📦 No patient data migration needed");
   }
 }
 

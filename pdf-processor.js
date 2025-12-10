@@ -353,7 +353,7 @@ class PDFProcessor {
     return true;
   }
 
-  generateCSVFromExtractedData(extractedDataArray, idPrefix = '') {
+  generateCSVFromExtractedData(extractedDataArray, idPrefix = '', filterExported = false) {
     const headers = ["RequestID", "ProcDate", "AnCode", "StringValue"];
     const csvRows = [headers.join(",")];
     const procDate = this.formatProcDate(new Date());
@@ -371,6 +371,9 @@ class PDFProcessor {
       // Concatenate ID prefix with patient text
       const fullId = idPrefix + patientText;
 
+      // Get exported tests for filtering
+      const exportedTests = data.exportedTests || {};
+
       // Extract all test results (already stored by key)
       if (data.structuredData?.testResults) {
         const seenKeys = new Set();
@@ -378,6 +381,11 @@ class PDFProcessor {
           // Avoid duplicates per patient
           if (seenKeys.has(key)) return;
           seenKeys.add(key);
+
+          // Skip already exported tests if filtering is enabled
+          if (filterExported && exportedTests[key]) {
+            return;
+          }
 
           const requestId = `${fullId}-${patientName}`;
           const row = [
