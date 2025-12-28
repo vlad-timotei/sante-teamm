@@ -1,8 +1,8 @@
-# Adding New Lab Tests to the Extension
+# Adding New Lab Tests
 
 ## Quick Start
 
-To add a new lab test, edit **one file**: `test-config.js`
+To add a new lab test, edit **one file**: `tampermonkey/test-config.js`
 
 Add a new object to the `TEST_DEFINITIONS` array:
 
@@ -43,22 +43,29 @@ const TEST_DEFINITIONS = [
 | Pattern | Matches | Example |
 |---------|---------|---------|
 | `Test` | Exact match | "Test" |
-| `Test[ăa]?` | Optional diacritic | "Testa" or "Testă" |
+| `Test[ăa]?` | Optional diacritic | "Testa" or "Testa" |
 | `Test\\s+Name` | Space between words | "Test Name" |
 | `Test[\\s-]?Name` | Optional space or hyphen | "Test Name", "Test-Name" |
 | `(Test1\|Test2)` | Either variant | "Test1" or "Test2" |
 
 ## Testing Your Changes
 
-1. Reload the extension in Chrome (`chrome://extensions/` → refresh icon)
-2. Navigate to Clinica Sante and open a PDF containing your test
-3. Click "Analizează PDF"
-4. Verify the test appears in the table
-5. Export and check the CSV contains the correct key
+### Production (GitHub)
+1. Push your changes to the `main` branch
+2. Wait a few minutes for GitHub's raw file cache to update
+3. Refresh the target page - Tampermonkey will fetch the updated script
+
+### Local Development
+1. Start the local server: `cd tampermonkey && python3 -m http.server 8080`
+2. Install `sante-extractor.dev.user.js` in Tampermonkey
+3. After making changes, run `./bump.sh` to invalidate cache
+4. Refresh the target page
 
 ## Files Overview
 
-- `test-config.js` - Single source of truth for all test definitions
-- `pdf-processor.js` - Uses TEST_DEFINITIONS for extraction
-- `content.js` - Uses TEST_DEFINITIONS for display
-- `manifest.json` - Loads test-config.js before other scripts
+| File | Purpose |
+|------|---------|
+| `tampermonkey/test-config.js` | Single source of truth for test definitions |
+| `tampermonkey/pdf-processor.js` | Uses TEST_DEFINITIONS for extraction |
+| `tampermonkey/ui-components.js` | Uses TEST_DEFINITIONS for display |
+| `tampermonkey/csv-handler.js` | Uses TEST_DEFINITIONS for export columns |

@@ -1,6 +1,6 @@
 # Sante PDF Batch Extractor
 
-A Chrome extension for batch processing and extracting data from PDF medical reports on rezultateptmedici.clinica-sante.ro.
+A Tampermonkey userscript for batch processing and extracting data from PDF medical reports on rezultateptmedici.clinica-sante.ro.
 
 ## Features
 
@@ -9,17 +9,19 @@ A Chrome extension for batch processing and extracting data from PDF medical rep
 - **Auto-Navigate Pages**: Automatically navigate through all pages and select all PDFs
 - **PDF Data Extraction**: Extract text and structured data from medical PDFs using PDF.js
 - **CSV Export**: Export all extracted data to CSV format with patient information
+- **Auto-Upload**: Automatically upload extracted data to teamm.work
 
 ## Installation
 
-1. **Load the Extension in Chrome**:
-   - Open Chrome and go to `chrome://extensions/`
-   - Enable "Developer mode" in the top-right corner
-   - Click "Load unpacked" and select the `sante` folder
+1. **Install Tampermonkey** in your browser:
+   - [Chrome](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+   - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/)
+   - [Edge](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd)
 
-2. **Verify Installation**:
-   - The extension should appear in your extensions list
-   - You may need to pin it to your toolbar for easy access
+2. **Install the userscript**:
+   - Click the raw link: [sante-extractor.user.js](https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/sante-extractor.user.js)
+   - Tampermonkey will open and ask to install
+   - Click "Install"
 
 ## Usage
 
@@ -35,7 +37,7 @@ A Chrome extension for batch processing and extracting data from PDF medical rep
 
    ### Individual PDF Selection
    - Click the blue **"+ Batch"** button next to any download link
-   - The button will briefly show "✓ Added" to confirm
+   - The button will briefly show "Added" to confirm
    - The batch counter in the top-right panel will update
 
    ### Bulk Selection Options
@@ -55,39 +57,45 @@ For each PDF, the extension extracts:
 
 - **Patient Information**: Name, CNP, birth date, collection unit, barcode, dates
 - **PDF Metadata**: Number of pages, file size, extraction timestamp
-- **Text Content**: Full text extracted from all pages
-- **Structured Data**: Parsed medical values, test results, and dates
+- **Structured Data**: Parsed medical values and test results
 
-## CSV Export Format
+## Local Development
 
-The exported CSV includes columns for:
-- Nr Doc, Nume, CNP, Data Nasterii
-- Unitate Recoltare, Cod Bare, Data Recoltare, Data Rezultate
-- Pages, Extraction Date, Full Text, Structured Data (JSON)
+For testing changes locally without pushing to GitHub:
 
-## Troubleshooting
+1. **Start a local server**:
+   ```bash
+   cd tampermonkey
+   python3 -m http.server 8080
+   ```
 
-- **Extension not appearing**: Make sure you're on the correct domain
-- **Batch buttons not showing**: Refresh the page and wait for it to fully load
-- **PDF processing fails**: Check browser console for errors, ensure PDF.js loads properly
-- **Auto-navigation not working**: Try manual page selection first
+2. **Install the dev script** in Tampermonkey:
+   - Open `sante-extractor.dev.user.js` and install it
+
+3. **After making changes**, bump the cache version:
+   ```bash
+   ./bump.sh
+   ```
+
+4. **Refresh** the target page to load updated scripts
 
 ## Technical Notes
 
-- Uses PDF.js library for text extraction
-- Handles ASPX postback mechanisms for PDF downloads
+- Uses PDF.js library for text extraction (loaded via CDN)
+- Uses GM.* APIs for cross-tab storage between domains
+- Modular architecture with separate files for each component
 - Processes PDFs client-side without sending data to external servers
-- Supports Chrome Manifest V3
 
 ## Customization
 
-You can modify `pdf-processor.js` to:
-- Add custom data extraction patterns
-- Change the output CSV format
-- Add specific medical report parsing logic
+Edit files in the `tampermonkey/` folder:
+- `test-config.js` - Add/modify medical test patterns (see ADDING_NEW_TESTS.md)
+- `pdf-processor.js` - PDF text extraction logic
+- `csv-handler.js` - CSV export format
+- `ui-components.js` - User interface components
 
 ## Security
 
 - All processing happens locally in your browser
-- No data is sent to external servers
-- Only works on the specified medical portal domain
+- No data is sent to external servers (except teamm.work upload if used)
+- Only works on the specified domains
