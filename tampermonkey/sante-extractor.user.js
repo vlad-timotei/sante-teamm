@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Sante PDF Batch Extractor
-// @namespace    https://github.com/ptrsvltns/sante_extension
+// @namespace    https://github.com/vlad-timotei/sante-teamm
 // @version      1.1.0
 // @description  Batch extract data from PDFs on rezultateptmedici.clinica-sante.ro
-// @author       Vlad Patrascu
+// @author       Vlad T
 // @match        *://rezultateptmedici.clinica-sante.ro/*
 // @match        *://teamm.work/admin/guests/intake-values-import-dumbrava*
 // @grant        GM.setValue
@@ -11,18 +11,18 @@
 // @grant        GM.deleteValue
 // @grant        unsafeWindow
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/storage-adapter.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/test-config.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/queue-manager.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/pdf-processor.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/ui-components.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/csv-handler.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/export-handler.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/batch-processor.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/content.js
-// @require      https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/teamm-uploader.js
-// @updateURL    https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/sante-extractor.user.js
-// @downloadURL  https://raw.githubusercontent.com/ptrsvltns/sante_extension/main/tampermonkey/sante-extractor.user.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/storage-adapter.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/test-config.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/queue-manager.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/pdf-processor.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/ui-components.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/csv-handler.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/export-handler.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/batch-processor.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/content.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/teamm-uploader.js
+// @updateURL    https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/sante-extractor.user.js
+// @downloadURL  https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/sante-extractor.user.js
 // @run-at       document-end
 // @noframes
 // ==/UserScript==
