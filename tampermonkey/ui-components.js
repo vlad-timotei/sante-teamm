@@ -376,6 +376,15 @@ function createSingleProcessButton() {
   buttonContainer.innerHTML = `
     <div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
       <input type="hidden" id="id-prefix">
+      <span id="id-prefix-display" style="
+        background: #17a2b8;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        display: none;
+      "></span>
       <label for="csv-upload" style="
         background: #28a745;
         color: white;

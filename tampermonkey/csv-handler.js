@@ -149,6 +149,17 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
   const csvLabel = document.querySelector('label[for="csv-upload"]');
   if (!csvLabel) return;
 
+  // Update prefix display
+  const prefixDisplay = document.getElementById("id-prefix-display");
+  if (prefixDisplay) {
+    if (isStored && idPrefix) {
+      prefixDisplay.textContent = `Prefix: ${idPrefix}`;
+      prefixDisplay.style.display = "inline-block";
+    } else {
+      prefixDisplay.style.display = "none";
+    }
+  }
+
   if (isStored) {
     csvLabel.innerHTML = `Sejur ${idPrefix} (${patientCount} pacienți) <span id="clear-csv-data" style="
       margin-left: 8px;
@@ -200,34 +211,32 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
 function autoDetectIdPrefix(csvPatients) {
   if (csvPatients.length === 0) return null;
 
-  const prefixCounts = {};
+  // Get first valid ID (minimum 4 chars for format YYSN + NN)
+  const firstValidPatient = csvPatients.find((p) => p.fullId && p.fullId.length >= 4);
+  if (!firstValidPatient) return null;
 
-  csvPatients.forEach((patient) => {
-    if (patient.fullId && patient.fullId.length >= 5) {
-      const prefix = patient.fullId.substring(0, 5);
-      prefixCounts[prefix] = (prefixCounts[prefix] || 0) + 1;
-    }
-  });
+  // Prefix is everything except the last 2 digits (patient number)
+  const prefix = firstValidPatient.fullId.slice(0, -2);
 
-  let mostCommonPrefix = "";
-  let maxCount = 0;
+  console.log(`🔍 Detected prefix: "${prefix}" from ID "${firstValidPatient.fullId}"`);
 
-  Object.entries(prefixCounts).forEach(([prefix, count]) => {
-    if (count > maxCount) {
-      maxCount = count;
-      mostCommonPrefix = prefix;
-    }
-  });
-
-  if (mostCommonPrefix) {
+  if (prefix) {
     const idPrefixInput = document.getElementById("id-prefix");
     if (idPrefixInput) {
-      idPrefixInput.value = mostCommonPrefix;
+      idPrefixInput.value = prefix;
       console.log(
-        `✅ Auto-detected ID prefix: ${mostCommonPrefix} (${maxCount}/${csvPatients.length} patients)`
+        `✅ Auto-detected ID prefix: ${prefix} (${csvPatients.length} patients)`
       );
     }
-    return mostCommonPrefix;
+
+    // Update the visible prefix display
+    const prefixDisplay = document.getElementById("id-prefix-display");
+    if (prefixDisplay) {
+      prefixDisplay.textContent = `Prefix: ${prefix}`;
+      prefixDisplay.style.display = "inline-block";
+    }
+
+    return prefix;
   }
   return null;
 }
@@ -485,11 +494,8 @@ function matchCSVToTablePatients(csvPatients) {
       );
       usedCSVPatients.add(bestMatch.index);
 
-      let idSuffix = bestMatch.patient.fullId;
-
-      if (bestMatch.patient.fullId.length > 5) {
-        idSuffix = bestMatch.patient.fullId.substring(5);
-      }
+      // Suffix is the last 2 digits (patient number)
+      const idSuffix = bestMatch.patient.fullId.slice(-2);
 
       console.log(
         `Table: ${tablePatient.name} → CSV: ${bestMatch.patient.name} → ID: ${bestMatch.patient.fullId} → Suffix: ${idSuffix}`
