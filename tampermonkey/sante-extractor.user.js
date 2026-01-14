@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sante PDF Batch Extractor
 // @namespace    https://github.com/vlad-timotei/sante-teamm
-// @version      1.1.0
+// @version      1.1.1
 // @description  Batch extract data from PDFs on rezultateptmedici.clinica-sante.ro
 // @author       Vlad T
 // @match        *://rezultateptmedici.clinica-sante.ro/*
@@ -30,7 +30,7 @@
 (function() {
   'use strict';
 
-  console.log('🚀 Sante PDF Batch Extractor v1.1.0 loaded');
+  console.log('🚀 Sante PDF Batch Extractor v1.1.1 loaded');
 
   // Make pdfjsLib available globally
   if (typeof pdfjsLib !== 'undefined') {
