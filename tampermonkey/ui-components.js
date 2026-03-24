@@ -464,12 +464,6 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
   const totalTests = Object.keys(testResults).length;
   const exportedCount = Object.keys(testResults).filter((k) => exportedTests[k]).length;
 
-  const showRefetch =
-    extractedData.statusChangedSinceImport === true ||
-    extractedData.importedStatus === "In lucru" ||
-    extractedData.importedStatus === "Rezultate partiale" ||
-    extractedData.needsReexport === true;
-
   let statusChangeBadge = "";
   if (extractedData.statusChangedSinceImport) {
     statusChangeBadge = `
@@ -490,12 +484,13 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
   }
 
   let refetchButton = "";
-  if (showRefetch && patientKey) {
+  if (patientKey) {
     const buttonLabel = extractedData.statusChangedSinceImport
       ? "🔄 Refetch Results"
       : extractedData.needsReexport
       ? "🔄 Refetch (new tests available)"
       : "🔄 Refetch";
+    const statusChanged = extractedData.statusChangedSinceImport === true;
     refetchButton = `
       <button
         class="refetch-btn"
@@ -503,7 +498,7 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
         style="
           background: #17a2b8;
           color: white;
-          border: none;
+          border: ${statusChanged ? "2px solid #dc3545" : "none"};
           padding: 4px 10px;
           border-radius: 3px;
           font-size: 11px;
