@@ -411,7 +411,7 @@
   // Public API
   // ----------------------------------------------------------------
 
-  window.SyncManager = {
+  const SyncManager = {
     init,
     pullState,
     pushState,
@@ -423,4 +423,11 @@
     getDeviceId,
     getDeviceName,
   };
+
+  window.SyncManager = SyncManager;
+
+  // Also expose on the page window so it's callable from the browser console
+  if (typeof unsafeWindow !== 'undefined') {
+    unsafeWindow.SyncManager = SyncManager;
+  }
 })();
