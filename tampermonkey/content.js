@@ -6,6 +6,9 @@ async function initializeBatchExtension() {
   window.pdfProcessor = new window.PDFProcessor();
   await window.pdfProcessor.loadPDFJS();
 
+  // Initialize sync manager
+  await window.SyncManager.init();
+
   // Migrate existing patient data to new structure (backward compatible)
   await window.migratePatientData();
 
@@ -44,6 +47,28 @@ async function initializeBatchExtension() {
     setTimeout(() => {
       window.tryLoadAnyStoredData();
     }, 500);
+
+    // Urmareste schimbarile prefixului si declanseaza sync cu serverul
+    const idPrefixInput = document.getElementById('id-prefix');
+    if (idPrefixInput) {
+      idPrefixInput.addEventListener('change', async () => {
+        const prefix = idPrefixInput.value.trim();
+        if (prefix) {
+          await window.SyncManager.setCurrentPrefix(prefix);
+          await window.syncUIWithLocalStorage();
+          window.checkForStoredCSVData?.();
+        }
+      });
+
+      // Daca exista deja un prefix setat la incarcare, activeaza sync
+      setTimeout(async () => {
+        const prefix = idPrefixInput.value.trim();
+        if (prefix) {
+          await window.SyncManager.setCurrentPrefix(prefix);
+          await window.syncUIWithLocalStorage();
+        }
+      }, 2000);
+    }
   }
 }
 

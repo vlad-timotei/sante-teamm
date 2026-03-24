@@ -23,6 +23,7 @@ async function saveQueueToStorage(queue) {
   try {
     await StorageAdapter.set({ "sante-export-queue": queue });
     console.log(`💾 Saved queue to storage: ${queue.length} patients`);
+    window.SyncManager?.schedulePush();
   } catch (error) {
     console.error("Failed to save queue to storage:", error);
   }

@@ -9,8 +9,11 @@
 // @grant        GM.setValue
 // @grant        GM.getValue
 // @grant        GM.deleteValue
+// @grant        GM.xmlHttpRequest
 // @grant        unsafeWindow
+// @connect      centruldumbrava.ro
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/sync-manager.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/storage-adapter.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/test-config.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/queue-manager.js

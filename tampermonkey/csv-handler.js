@@ -21,6 +21,7 @@ function storeCSVData(idPrefix, csvData) {
     console.log(
       `💾 Stored CSV data for prefix ${idPrefix}: ${csvData.length} patients`
     );
+    window.SyncManager?.schedulePush();
   } catch (error) {
     console.error("Failed to store CSV data:", error);
   }
