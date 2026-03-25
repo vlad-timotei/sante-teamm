@@ -1,4 +1,4 @@
-// Queue Manager v2.1.0
+// Queue Manager v2.2.0
 // Patient queue — reads from in-memory cache, writes to server via SyncManager
 
 function getPatientKey(idPrefix, patientName) {
@@ -89,7 +89,7 @@ async function migratePatientData() {
   queue.forEach((patient) => {
     let needsMigration = false;
 
-    if (patient.exportedTests === undefined) {
+    if (patient.exportedTests === undefined || Array.isArray(patient.exportedTests)) {
       patient.exportedTests = {};
 
       if (patient.exported && patient.exportedAt) {

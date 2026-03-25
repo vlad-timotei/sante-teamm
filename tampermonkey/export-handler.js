@@ -1,4 +1,4 @@
-// Export Handler v1.0.0
+// Export Handler v1.1.0
 // Data export and upload functionality
 
 async function exportData() {
@@ -144,7 +144,7 @@ async function exportData() {
     );
     if (exportedKeys.has(patientKey)) {
       const testResults = patient.structuredData?.testResults || {};
-      patient.exportedTests = patient.exportedTests || {};
+      if (!patient.exportedTests || Array.isArray(patient.exportedTests)) patient.exportedTests = {};
 
       Object.keys(testResults).forEach((testKey) => {
         if (!patient.exportedTests[testKey]) {
