@@ -246,18 +246,27 @@
     }
 
     // Merge CSV data (server wins if it has a newer timestamp)
-    if (result.csv_data && result.csv_updated_at) {
+    if (result.csv_updated_at) {
       const localKey       = `sante-csv-${prefix}`;
       const localRaw       = localStorage.getItem(localKey);
       const localTimestamp = localRaw ? (JSON.parse(localRaw).timestamp || 0) : 0;
 
       if (result.csv_updated_at > localTimestamp) {
-        localStorage.setItem(localKey, JSON.stringify({
-          data:      result.csv_data,
-          timestamp: result.csv_updated_at,
-          count:     result.csv_data.length,
-        }));
-        console.log(`[Sync] CSV data updated from server for ${prefix}`);
+        if (result.csv_data) {
+          // Server has newer CSV - update local
+          localStorage.setItem(localKey, JSON.stringify({
+            data:      result.csv_data,
+            timestamp: result.csv_updated_at,
+            count:     result.csv_data.length,
+          }));
+          console.log(`[Sync] CSV data updated from server for ${prefix}`);
+        } else {
+          // Server has a newer "cleared" state - clear local too
+          localStorage.removeItem(localKey);
+          localStorage.setItem(`sante-csv-cleared-${prefix}`, result.csv_updated_at.toString());
+          window.csvPatientData = [];
+          console.log(`[Sync] CSV data cleared from server signal for ${prefix}`);
+        }
         changed = true;
       }
     }
@@ -278,15 +287,19 @@
       (p) => (p.patientInfo?.idPrefix || '').toLowerCase() === prefix.toLowerCase()
     );
 
-    const localKey  = `sante-csv-${prefix}`;
-    const localRaw  = localStorage.getItem(localKey);
-    const csvParsed = localRaw ? JSON.parse(localRaw) : null;
+    const localKey   = `sante-csv-${prefix}`;
+    const localRaw   = localStorage.getItem(localKey);
+    const csvParsed  = localRaw ? JSON.parse(localRaw) : null;
+    const clearedAt  = localStorage.getItem(`sante-csv-cleared-${prefix}`);
+
+    // If CSV was cleared locally, send the cleared-at timestamp so other devices know to clear too
+    const csvUpdatedAt = csvParsed?.timestamp || (clearedAt ? parseInt(clearedAt) : null);
 
     const result = await apiCall('POST', 'state', {
       prefix,
       export_queue:   prefixQueue,
-      csv_data:       csvParsed?.data      || null,
-      csv_updated_at: csvParsed?.timestamp || null,
+      csv_data:       csvParsed?.data || null,
+      csv_updated_at: csvUpdatedAt,
     });
 
     if (result?.success) {
