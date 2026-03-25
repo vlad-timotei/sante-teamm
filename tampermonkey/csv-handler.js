@@ -1,4 +1,4 @@
-// CSV Handler v2.3.0
+// CSV Handler v2.4.0
 // CSV upload, parsing, and patient matching functions
 
 window.csvPatientData = [];
@@ -49,6 +49,11 @@ function clearPatientInputs() {
     input.style.backgroundColor = "";
   });
   document.querySelectorAll('.csv-match').forEach((el) => el.remove());
+  document.querySelectorAll('[id^="test-results-"]').forEach((cell) => {
+    cell.textContent = "Not processed";
+    cell.style.color = "#666";
+    cell.removeAttribute("title");
+  });
 }
 
 function checkForStoredCSVData() {
