@@ -1,4 +1,3 @@
-// CSV Handler v2.3.0
 // CSV upload, parsing, and patient matching functions
 
 window.csvPatientData = [];
@@ -9,15 +8,19 @@ async function storeCSVData(idPrefix, csvData) {
     idPrefix,
     state?.queue || [],
     csvData,
-    Date.now()
+    Date.now(),
   );
-  console.log(`💾 Stored CSV data for prefix ${idPrefix}: ${csvData.length} patients`);
+  console.log(
+    `💾 Stored CSV data for prefix ${idPrefix}: ${csvData.length} patients`,
+  );
 }
 
 function getStoredCSVData(idPrefix) {
   const state = window.SyncManager?.getCachedState();
   if (state?.prefix === idPrefix && state.csv_data) {
-    console.log(`📱 Retrieved CSV data for prefix ${idPrefix}: ${state.csv_data.length} patients`);
+    console.log(
+      `📱 Retrieved CSV data for prefix ${idPrefix}: ${state.csv_data.length} patients`,
+    );
     return state.csv_data;
   }
   return null;
@@ -29,7 +32,7 @@ async function clearStoredCSVData(idPrefix) {
     idPrefix,
     state?.queue || [],
     null,
-    Date.now()
+    Date.now(),
   );
   await window.SyncManager.clearCurrentSeries();
   console.log(`🗑️ Cleared CSV data for prefix ${idPrefix}`);
@@ -48,7 +51,7 @@ function clearPatientInputs() {
     input.value = "";
     input.style.backgroundColor = "";
   });
-  document.querySelectorAll('.csv-match').forEach((el) => el.remove());
+  document.querySelectorAll(".csv-match").forEach((el) => el.remove());
 }
 
 function checkForStoredCSVData() {
@@ -80,7 +83,7 @@ function checkForStoredCSVData() {
     displayMatchResults(matchResults);
 
     console.log(
-      `🔄 Auto-loaded stored CSV data for ${idPrefix} and performed matching`
+      `🔄 Auto-loaded stored CSV data for ${idPrefix} and performed matching`,
     );
 
     setTimeout(() => window.updateDownloadCount(), 100);
@@ -156,20 +159,24 @@ function autoDetectIdPrefix(csvPatients) {
   if (csvPatients.length === 0) return null;
 
   // Get first valid ID (minimum 4 chars for format YYSN + NN)
-  const firstValidPatient = csvPatients.find((p) => p.fullId && p.fullId.length >= 4);
+  const firstValidPatient = csvPatients.find(
+    (p) => p.fullId && p.fullId.length >= 4,
+  );
   if (!firstValidPatient) return null;
 
   // Prefix is everything except the last 2 digits (patient number)
   const prefix = firstValidPatient.fullId.slice(0, -2);
 
-  console.log(`🔍 Detected prefix: "${prefix}" from ID "${firstValidPatient.fullId}"`);
+  console.log(
+    `🔍 Detected prefix: "${prefix}" from ID "${firstValidPatient.fullId}"`,
+  );
 
   if (prefix) {
     const idPrefixInput = document.getElementById("id-prefix");
     if (idPrefixInput) {
       idPrefixInput.value = prefix;
       console.log(
-        `✅ Auto-detected ID prefix: ${prefix} (${csvPatients.length} patients)`
+        `✅ Auto-detected ID prefix: ${prefix} (${csvPatients.length} patients)`,
       );
     }
 
@@ -221,7 +228,9 @@ async function handleCSVUpload(event) {
         await window.SyncManager.loadState(detectedPrefix);
         // If load failed, _state.prefix won't match — abort to avoid data loss
         if (window.SyncManager?.getCachedState()?.prefix !== detectedPrefix) {
-          alert(`Failed to load series "${detectedPrefix}" from server. Check your connection and try again.`);
+          alert(
+            `Failed to load series "${detectedPrefix}" from server. Check your connection and try again.`,
+          );
           return;
         }
       }
@@ -286,13 +295,13 @@ function parseCSV(csvContent) {
   if (nameColumnIndex === -1 || idColumnIndex === -1) {
     throw new Error(
       `Required columns not found. Expected columns like "Nume și prenume" and "ID". Found: ${header.join(
-        ", "
-      )}`
+        ", ",
+      )}`,
     );
   }
 
   console.log(
-    `Using column ${nameColumnIndex} for names, column ${idColumnIndex} for IDs`
+    `Using column ${nameColumnIndex} for names, column ${idColumnIndex} for IDs`,
   );
 
   const patients = [];
@@ -357,9 +366,13 @@ function matchCSVToTablePatients(csvPatients) {
           const statusTitle = statusIcon.getAttribute("title");
           console.log(`Row ${rowIndex} status: ${statusTitle}`);
 
-          if (statusTitle !== "Efectuat cu rezultate" && statusTitle !== "In lucru" && statusTitle !== "Rezultate partiale") {
+          if (
+            statusTitle !== "Efectuat cu rezultate" &&
+            statusTitle !== "In lucru" &&
+            statusTitle !== "Rezultate partiale"
+          ) {
             console.log(
-              `⏭️ Skipping patient in row ${rowIndex} - status "${statusTitle}" not allowed`
+              `⏭️ Skipping patient in row ${rowIndex} - status "${statusTitle}" not allowed`,
             );
             return;
           }
@@ -378,7 +391,7 @@ function matchCSVToTablePatients(csvPatients) {
             importedStatus: statusTitle,
           });
           console.log(
-            `✅ Added patient for processing: ${name} (status: ${statusTitle})`
+            `✅ Added patient for processing: ${name} (status: ${statusTitle})`,
           );
         }
       }
@@ -394,7 +407,7 @@ function matchCSVToTablePatients(csvPatients) {
   const processedTablePatients = new Set();
 
   const sortedTablePatients = [...tablePatients].sort((a, b) =>
-    a.name.localeCompare(b.name)
+    a.name.localeCompare(b.name),
   );
 
   sortedTablePatients.forEach((tablePatient) => {
@@ -402,7 +415,7 @@ function matchCSVToTablePatients(csvPatients) {
 
     if (processedTablePatients.has(tableName)) {
       console.log(
-        `⏭️ SKIPPING DUPLICATE: "${tablePatient.name}" (already processed)`
+        `⏭️ SKIPPING DUPLICATE: "${tablePatient.name}" (already processed)`,
       );
       return;
     }
@@ -410,7 +423,7 @@ function matchCSVToTablePatients(csvPatients) {
     processedTablePatients.add(tableName);
 
     console.log(
-      `🔍 Processing table patient: "${tablePatient.name}" → normalized: "${tableName}"`
+      `🔍 Processing table patient: "${tablePatient.name}" → normalized: "${tableName}"`,
     );
     let bestMatch = null;
     let bestScore = 0;
@@ -432,7 +445,7 @@ function matchCSVToTablePatients(csvPatients) {
             csvPatient.name
           }" → normalized: "${csvName}" → score: ${score.toFixed(3)} ${
             isAlreadyUsed ? "(reused for exact match)" : ""
-          }`
+          }`,
         );
       }
 
@@ -446,7 +459,7 @@ function matchCSVToTablePatients(csvPatients) {
       console.log(
         `✅ MATCH FOUND: "${tablePatient.name}" ↔ "${
           bestMatch.patient.name
-        }" (score: ${bestScore.toFixed(3)})`
+        }" (score: ${bestScore.toFixed(3)})`,
       );
       usedCSVPatients.add(bestMatch.index);
 
@@ -454,7 +467,7 @@ function matchCSVToTablePatients(csvPatients) {
       const idSuffix = bestMatch.patient.fullId.slice(-2);
 
       console.log(
-        `Table: ${tablePatient.name} → CSV: ${bestMatch.patient.name} → ID: ${bestMatch.patient.fullId} → Suffix: ${idSuffix}`
+        `Table: ${tablePatient.name} → CSV: ${bestMatch.patient.name} → ID: ${bestMatch.patient.fullId} → Suffix: ${idSuffix}`,
       );
 
       matches.push({
@@ -468,10 +481,10 @@ function matchCSVToTablePatients(csvPatients) {
     } else {
       console.log(
         `❌ NO MATCH: "${tablePatient.name}" (best score: ${bestScore.toFixed(
-          3
+          3,
         )} with "${
           bestMatch?.patient?.name || "none"
-        }" - below threshold 0.666)`
+        }" - below threshold 0.666)`,
       );
       unmatched.push({
         tablePatient: tablePatient,
@@ -510,7 +523,7 @@ function calculateNameSimilarity(name1, name2) {
 
   words1.forEach((word1) => {
     const bestWordMatch = Math.max(
-      ...words2.map((word2) => calculateLevenshteinSimilarity(word1, word2))
+      ...words2.map((word2) => calculateLevenshteinSimilarity(word1, word2)),
     );
     if (bestWordMatch > 0.8) {
       matchingWords++;
@@ -540,7 +553,7 @@ function calculateLevenshteinSimilarity(str1, str2) {
       matrix[i][j] = Math.min(
         matrix[i - 1][j] + 1,
         matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
+        matrix[i - 1][j - 1] + cost,
       );
     }
   }
@@ -565,7 +578,7 @@ function displayMatchResults(results) {
   matches.forEach((match) => {
     const linkId = match.tablePatient.downloadLink.id;
     console.log(
-      `Processing match for link ID: ${linkId}, table patient: ${match.tablePatient.name}`
+      `Processing match for link ID: ${linkId}, table patient: ${match.tablePatient.name}`,
     );
 
     let patientInput = null;
@@ -611,7 +624,7 @@ function displayMatchResults(results) {
       const rowInputs = row.querySelectorAll('input[type="text"]');
       console.log(
         `Found ${rowInputs.length} text inputs in row:`,
-        Array.from(rowInputs).map((input) => input.id || "no-id")
+        Array.from(rowInputs).map((input) => input.id || "no-id"),
       );
       if (rowInputs.length > 0) {
         patientInput = rowInputs[0];
@@ -632,7 +645,7 @@ function displayMatchResults(results) {
             console.log(
               `✓ Found input in parent level ${i + 1}: ${
                 patientInput.id || "no-id"
-              }`
+              }`,
             );
             break;
           }
@@ -644,7 +657,7 @@ function displayMatchResults(results) {
     console.log(
       `Final result for ${
         match.tablePatient.name
-      }: input found = ${!!patientInput}`
+      }: input found = ${!!patientInput}`,
     );
 
     if (patientInput) {
@@ -653,18 +666,18 @@ function displayMatchResults(results) {
         match.matchQuality === "exact"
           ? "#d4edda"
           : match.matchQuality === "good"
-          ? "#fff3cd"
-          : "#f8d7da";
+            ? "#fff3cd"
+            : "#f8d7da";
       autoFilled++;
       const matchTypeLog =
         match.matchQuality === "exact"
           ? "✅ EXACT MATCH"
           : match.matchQuality === "good"
-          ? "🔶 GOOD MATCH (partial)"
-          : "⚠️ FAIR MATCH (partial)";
+            ? "🔶 GOOD MATCH (partial)"
+            : "⚠️ FAIR MATCH (partial)";
 
       console.log(
-        `${matchTypeLog}: Table "${match.tablePatient.name}" ↔ CSV "${match.csvPatient.name}" (ID: ${match.csvPatient.fullId}) → filled ${match.idSuffix}`
+        `${matchTypeLog}: Table "${match.tablePatient.name}" ↔ CSV "${match.csvPatient.name}" (ID: ${match.csvPatient.fullId}) → filled ${match.idSuffix}`,
       );
 
       const nameCell = match.tablePatient.row.cells[1];
@@ -689,7 +702,7 @@ function displayMatchResults(results) {
       const allInputs = document.querySelectorAll('input[id*="patient-text-"]');
       console.log(
         `Available patient inputs:`,
-        Array.from(allInputs).map((inp) => inp.id)
+        Array.from(allInputs).map((inp) => inp.id),
       );
     }
   });
@@ -706,7 +719,7 @@ function displayMatchResults(results) {
   }, 2000);
 
   console.log(
-    `✅ CSV matching complete: ${matches.length} matched, ${unmatched.length} require manual attention`
+    `✅ CSV matching complete: ${matches.length} matched, ${unmatched.length} require manual attention`,
   );
 }
 
