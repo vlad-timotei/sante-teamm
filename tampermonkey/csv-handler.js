@@ -1,4 +1,4 @@
-// CSV Handler v2.5.0
+// CSV Handler v2.4.0
 // CSV upload, parsing, and patient matching functions
 
 window.csvPatientData = [];
@@ -88,10 +88,7 @@ function checkForStoredCSVData() {
       `🔄 Auto-loaded stored CSV data for ${idPrefix} and performed matching`
     );
 
-    setTimeout(async () => {
-      await window.syncUIWithLocalStorage?.();
-      window.updateDownloadCount();
-    }, 100);
+    setTimeout(() => window.updateDownloadCount(), 100);
   } else {
     console.log(`❌ No stored CSV data found for prefix: ${idPrefix}`);
   }
