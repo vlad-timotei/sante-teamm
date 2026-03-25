@@ -158,11 +158,15 @@ switch ($action) {
         } elseif ($method === 'POST') {
             $body   = json_decode(file_get_contents('php://input'), true);
             $prefix = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['prefix'] ?? ''), 0, 30);
-            if (!$prefix) { http_response_code(400); echo json_encode(['error' => 'Missing prefix']); exit; }
 
-            // Clear current flag on all, then set on this prefix
+            // Clear current flag on all series
             $pdo->exec("UPDATE series_state SET is_current = 0");
-            $pdo->prepare("UPDATE series_state SET is_current = 1 WHERE prefix = ?")->execute([$prefix]);
+
+            // If a prefix was provided, mark it as current
+            if ($prefix) {
+                $pdo->prepare("UPDATE series_state SET is_current = 1 WHERE prefix = ?")->execute([$prefix]);
+            }
+
             echo json_encode(['success' => true]);
         }
         break;
