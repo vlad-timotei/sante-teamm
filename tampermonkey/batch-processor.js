@@ -1,4 +1,4 @@
-// Batch Processor v1.0.0
+// Batch Processor v1.1.0
 // Batch processing, PDF download, and analysis functions
 
 // Global state for batch processing (using window.* to avoid shadowing issues)
@@ -76,17 +76,11 @@ async function addToBatch(element, index, batchBtn) {
   }
 
   const patientData = {
-    nrDoc: cells[0]?.textContent.trim(),
     nume: cells[1]?.textContent.trim().replace(/\s*\(CSV:.*$/, "").trim(),
     cnp: cells[2]?.textContent.trim(),
     dataNasterii: cells[3]?.textContent.trim(),
-    unitateRecoltare: cells[4]?.textContent.trim(),
-    codBare: cells[5]?.textContent.trim(),
-    dataRecoltare: cells[6]?.textContent.trim(),
-    dataRezultate: cells[7]?.textContent.trim(),
     patientText: patientText,
     idPrefix: idPrefix,
-    importedStatus: importedStatus,
   };
 
   const patientName = patientData.nume.trim();
@@ -186,8 +180,7 @@ async function addToBatch(element, index, batchBtn) {
     await downloadAndProcessPDF(element, batchItem);
 
     const extractedItem = window.extractedData.find(
-      (item) =>
-        item.debugInfo?.elementIndex === index || item.id === batchItem.id
+      (item) => item.id === batchItem.id
     );
 
     if (extractedItem) {
@@ -962,13 +955,6 @@ async function downloadAndProcessPDF(downloadLink, batchItem, skipUIUpdate = fal
               textLength: extractedPDFData.extractedText?.length,
               hasError: !!extractedPDFData.error,
             });
-
-            extractedPDFData.debugInfo = {
-              elementIndex: batchItem.elementIndex,
-              batchId: batchItem.id,
-              patientName: patientName,
-              extractionTimestamp: Date.now(),
-            };
 
             extractedPDFData.exported = false;
             extractedPDFData.exportedAt = null;

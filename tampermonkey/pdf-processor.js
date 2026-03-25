@@ -1,4 +1,4 @@
-// PDF Processor v1.0.0
+// PDF Processor v1.1.0
 // Modified for Tampermonkey - uses StorageAdapter for worker URL
 
 class PDFProcessor {
@@ -33,9 +33,7 @@ class PDFProcessor {
       let fullText = "";
       const extractedData = {
         patientInfo: patientData,
-        pageCount: pdf.numPages,
         structuredData: {},
-        extractionDate: new Date().toISOString(),
       };
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -68,27 +66,15 @@ class PDFProcessor {
       return {
         patientInfo: patientData,
         error: error.message,
-        extractionDate: new Date().toISOString(),
       };
     }
   }
 
   extractMedicalData(text, patientData) {
     const structuredData = {
-      reportInfo: {},
       patientInfo: {},
       testResults: {},
     };
-
-    const reportNumberMatch = text.match(/Buletin de analize medicale nr\.\s*(\d+)/);
-    if (reportNumberMatch) {
-      structuredData.reportInfo.bulletinNumber = reportNumberMatch[1];
-    }
-
-    const reportDateMatch = text.match(/Data raportului:\s*([0-9.]+\s+[0-9:]+)/);
-    if (reportDateMatch) {
-      structuredData.reportInfo.reportDate = reportDateMatch[1];
-    }
 
     const patientNameMatch = text.match(/Nume\/Prenume:\s*([^]*?)(?=Data cerere|$)/);
     if (patientNameMatch) {
@@ -101,21 +87,6 @@ class PDFProcessor {
         structuredData.patientInfo.name = fallbackMatch[1].trim();
         console.log(`📝 Extracted patient name (fallback): "${fallbackMatch[1].trim()}"`);
       }
-    }
-
-    const cnpMatch = text.match(/CNP:\s*(\d+)/);
-    if (cnpMatch) {
-      structuredData.patientInfo.cnp = cnpMatch[1];
-    }
-
-    const doctorMatch = text.match(/Medic trimitator:\s*([^\n]+)/);
-    if (doctorMatch) {
-      structuredData.patientInfo.referringDoctor = doctorMatch[1].trim();
-    }
-
-    const collectionDateMatch = text.match(/Data si ora recoltare:\s*([0-9.\s:]+)/);
-    if (collectionDateMatch) {
-      structuredData.patientInfo.collectionDate = collectionDateMatch[1].trim();
     }
 
     this.extractAllTestValues(text, structuredData);
