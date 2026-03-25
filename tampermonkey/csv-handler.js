@@ -1,4 +1,4 @@
-// CSV Handler v2.1.0
+// CSV Handler v2.2.0
 // CSV upload, parsing, and patient matching functions
 
 window.csvPatientData = [];
@@ -31,6 +31,7 @@ async function clearStoredCSVData(idPrefix) {
     null,
     Date.now()
   );
+  await window.SyncManager.clearCurrentSeries();
   console.log(`🗑️ Cleared CSV data for prefix ${idPrefix}`);
 }
 

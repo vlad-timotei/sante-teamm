@@ -1,5 +1,5 @@
 <?php
-// Sante Sync API v1.1.0
+// Sante Sync API v1.2.0
 
 require_once __DIR__ . '/config.php';
 
@@ -69,15 +69,6 @@ try {
     // Column already exists, ignore
 }
 
-$pdo->exec("
-    CREATE TABLE IF NOT EXISTS series_locks (
-        prefix       VARCHAR(30)  NOT NULL PRIMARY KEY,
-        device_id    VARCHAR(64)  NOT NULL,
-        device_name  VARCHAR(100) NOT NULL,
-        locked_at    DATETIME     NOT NULL,
-        expires_at   DATETIME     NOT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-");
 
 // --- Verify credentials ---
 $stmt = $pdo->prepare('SELECT password_hash FROM users WHERE username = ?');
@@ -153,60 +144,6 @@ switch ($action) {
         }
         break;
 
-    // ================================================================
-    // GET    ?action=locks  -> list active locks
-    // POST   ?action=lock   -> acquire lock on a series
-    // DELETE ?action=lock   -> release lock
-    // ================================================================
-    case 'locks':
-    case 'lock':
-        if ($method === 'GET' || $action === 'locks') {
-            $stmt = $pdo->query('SELECT prefix, device_name, locked_at, expires_at FROM series_locks WHERE expires_at > NOW()');
-            echo json_encode(['success' => true, 'locks' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
-
-        } elseif ($method === 'POST') {
-            $body   = json_decode(file_get_contents('php://input'), true);
-            $prefix = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['prefix'] ?? ''), 0, 30);
-            $force  = !empty($body['force']);
-
-            if (!$prefix) { http_response_code(400); echo json_encode(['error' => 'Missing prefix']); exit; }
-
-            // Check for an existing unexpired lock held by someone else
-            $stmt = $pdo->prepare('SELECT * FROM series_locks WHERE prefix = ? AND expires_at > NOW()');
-            $stmt->execute([$prefix]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($existing && $existing['device_id'] !== $deviceId && !$force) {
-                echo json_encode([
-                    'success'   => false,
-                    'locked'    => true,
-                    'locked_by' => $existing['device_name'],
-                    'locked_at' => $existing['locked_at'],
-                ]);
-            } else {
-                // Acquire or refresh lock (expires in 30 minutes)
-                $stmt = $pdo->prepare('
-                    INSERT INTO series_locks (prefix, device_id, device_name, locked_at, expires_at)
-                    VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 MINUTE))
-                    ON DUPLICATE KEY UPDATE
-                        device_id   = VALUES(device_id),
-                        device_name = VALUES(device_name),
-                        locked_at   = NOW(),
-                        expires_at  = DATE_ADD(NOW(), INTERVAL 30 MINUTE)
-                ');
-                $stmt->execute([$prefix, $deviceId, $deviceName]);
-                echo json_encode(['success' => true, 'locked' => false]);
-            }
-
-        } elseif ($method === 'DELETE') {
-            $body   = json_decode(file_get_contents('php://input'), true);
-            $prefix = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['prefix'] ?? ''), 0, 30);
-
-            $stmt = $pdo->prepare('DELETE FROM series_locks WHERE prefix = ? AND device_id = ?');
-            $stmt->execute([$prefix, $deviceId]);
-            echo json_encode(['success' => true]);
-        }
-        break;
 
     // ================================================================
     // GET  ?action=series         -> returns the current active series

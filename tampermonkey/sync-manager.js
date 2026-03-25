@@ -1,4 +1,4 @@
-// Sync Manager v2.0.0
+// Sync Manager v2.1.0
 // DB-only: all state lives on the server, in-memory cache per session
 
 (function () {
@@ -286,6 +286,11 @@
     console.log(`[Sync] Marked ${prefix} as current series`);
   }
 
+  async function clearCurrentSeries() {
+    await apiCall('POST', 'series', { prefix: null });
+    console.log('[Sync] Cleared current series');
+  }
+
   async function fetchCurrentSeries() {
     const result = await apiCall('GET', 'series');
     return result?.current?.prefix || null;
@@ -314,6 +319,7 @@
     saveState,
     getCachedState,
     setCurrentSeries,
+    clearCurrentSeries,
     fetchCurrentSeries,
     resetCredentials,
     getDeviceId,
