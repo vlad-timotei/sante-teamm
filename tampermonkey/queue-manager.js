@@ -1,5 +1,5 @@
-// Queue Manager v1.0.0
-// Patient queue storage and management functions
+// Queue Manager v2.0.0
+// Patient queue — reads from in-memory cache, writes to server via SyncManager
 
 function getPatientKey(idPrefix, patientName) {
   const normalizedPrefix = (idPrefix || "").trim().toLowerCase();
@@ -8,25 +8,25 @@ function getPatientKey(idPrefix, patientName) {
 }
 
 async function loadQueueFromStorage() {
-  try {
-    const result = await StorageAdapter.get(["sante-export-queue"]);
-    const queue = result["sante-export-queue"] || [];
-    console.log(`📦 Loaded queue from storage: ${queue.length} patients`);
-    return queue;
-  } catch (error) {
-    console.error("Failed to load queue from storage:", error);
-    return [];
-  }
+  const state = window.SyncManager?.getCachedState();
+  const queue = state?.queue || [];
+  console.log(`📦 Loaded queue from storage: ${queue.length} patients`);
+  return queue;
 }
 
 async function saveQueueToStorage(queue) {
-  try {
-    await StorageAdapter.set({ "sante-export-queue": queue });
-    console.log(`💾 Saved queue to storage: ${queue.length} patients`);
-    window.SyncManager?.schedulePush();
-  } catch (error) {
-    console.error("Failed to save queue to storage:", error);
+  const state = window.SyncManager?.getCachedState();
+  if (!state?.prefix) {
+    console.warn('💾 Cannot save queue: no active series loaded');
+    return;
   }
+  await window.SyncManager.saveState(
+    state.prefix,
+    queue,
+    state.csv_data,
+    state.csv_updated_at
+  );
+  console.log(`💾 Saved queue to server: ${queue.length} patients`);
 }
 
 async function getQueueData() {
@@ -34,12 +34,13 @@ async function getQueueData() {
 }
 
 async function clearQueue() {
-  try {
-    await StorageAdapter.remove("sante-export-queue");
-    console.log("🗑️ Queue cleared from storage");
-  } catch (error) {
-    console.error("Failed to clear queue:", error);
+  const state = window.SyncManager?.getCachedState();
+  if (!state?.prefix) {
+    console.warn('🗑️ Cannot clear queue: no active series loaded');
+    return;
   }
+  await window.SyncManager.saveState(state.prefix, [], state.csv_data, state.csv_updated_at);
+  console.log("🗑️ Queue cleared");
 }
 
 async function resetExportedStatus() {

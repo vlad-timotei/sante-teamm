@@ -1,88 +1,62 @@
-// Content v1.0.0
-// Main initialization and UI sync
+// Content v2.0.0
+// Main initialization — DB-only sync, no localStorage timeouts
 
 async function initializeBatchExtension() {
-  // Initialize PDF processor with full PDF.js
   window.pdfProcessor = new window.PDFProcessor();
   await window.pdfProcessor.loadPDFJS();
 
-  // Initialize sync manager
   await window.SyncManager.init();
 
-  // Migrate existing patient data to new structure (backward compatible)
-  await window.migratePatientData();
-
-  // Hide the Charisma footer
   window.hideCharismaFooter();
-
-  // Make filter form collapsible
   window.makeFiltersCollapsible();
-
-  // Add test results column to table
   window.addTestResultsColumn();
 
-  // Find all download buttons/links on the page
   const downloadElements = window.findDownloadElements();
+  if (downloadElements.length === 0) return;
 
-  if (downloadElements.length > 0) {
-    window.injectBatchButtons(downloadElements);
-    window.createSingleProcessButton();
+  window.injectBatchButtons(downloadElements);
+  window.createSingleProcessButton();
 
-    // Add event delegation for refetch buttons (once)
-    document.addEventListener("click", async (e) => {
-      if (e.target.classList.contains("refetch-btn")) {
-        e.preventDefault();
-        const patientKey = e.target.dataset.patientKey;
-        const row = e.target.closest("tr");
-        await window.refetchPatientData(patientKey, row);
-      }
-    });
-
-    // Sync UI with localStorage (delayed to let table load)
-    setTimeout(async () => {
-      await window.syncUIWithLocalStorage();
-    }, 1500);
-
-    // Check for stored CSV data after everything is set up (fix #4: runs before server sync)
-    setTimeout(() => {
-      window.tryLoadAnyStoredData();
-    }, 500);
-
-    const idPrefixInput = document.getElementById('id-prefix');
-    if (idPrefixInput) {
-      // Manual prefix change: setCurrentPrefix handles pull + lock
-      idPrefixInput.addEventListener('change', async () => {
-        const prefix = idPrefixInput.value.trim();
-        if (prefix) {
-          window._serverSyncDone = true; // prevent timeout from re-running
-          await window.SyncManager.setCurrentPrefix(prefix);
-          await window.syncUIWithLocalStorage();
-          window.checkForStoredCSVData?.();
-        }
-      });
-
-      // On every page load: full server sync after local data is ready (fix #4: 2500ms > 500ms local load)
-      // _serverSyncDone prevents double-run if change event fires before the timeout
-      window._serverSyncDone = false;
-      setTimeout(async () => {
-        if (window._serverSyncDone) return;
-        window._serverSyncDone = true;
-
-        let prefix = idPrefixInput.value.trim();
-        if (!prefix) {
-          prefix = await window.SyncManager.fetchCurrentSeries();
-          if (prefix) {
-            idPrefixInput.value = prefix;
-            console.log(`[Sync] Auto-loaded current series from server: ${prefix}`);
-          }
-        }
-        if (prefix) {
-          await window.SyncManager.forceSync(prefix);
-          await window.syncUIWithLocalStorage();
-          window.checkForStoredCSVData?.();
-        }
-      }, 2500);
+  document.addEventListener("click", async (e) => {
+    if (e.target.classList.contains("refetch-btn")) {
+      e.preventDefault();
+      const patientKey = e.target.dataset.patientKey;
+      const row = e.target.closest("tr");
+      await window.refetchPatientData(patientKey, row);
     }
+  });
+
+  const idPrefixInput = document.getElementById("id-prefix");
+
+  // Determine active series prefix
+  let prefix = idPrefixInput?.value.trim();
+  if (!prefix) {
+    prefix = await window.SyncManager.fetchCurrentSeries();
+    if (prefix && idPrefixInput) {
+      idPrefixInput.value = prefix;
+      console.log(`[Sync] Auto-loaded current series from server: ${prefix}`);
+    }
+  }
+
+  // Load state from server and set up UI
+  if (prefix) {
+    await window.SyncManager.loadState(prefix);
+    await window.SyncManager.setCurrentSeries(prefix);
+    await window.migratePatientData();
+    await window.syncUIWithLocalStorage();
+    window.checkForStoredCSVData?.();
+  }
+
+  // Prefix change: load fresh state from server
+  if (idPrefixInput) {
+    idPrefixInput.addEventListener("change", async () => {
+      const p = idPrefixInput.value.trim();
+      if (!p) return;
+      await window.SyncManager.loadState(p);
+      await window.SyncManager.setCurrentSeries(p);
+      await window.syncUIWithLocalStorage();
+      window.checkForStoredCSVData?.();
+    });
   }
 }
 

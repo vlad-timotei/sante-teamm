@@ -1,15 +1,13 @@
-// Sync Manager v1.2.0
-// Centralized sync with the PHP server for multi-device teams
+// Sync Manager v2.0.0
+// DB-only: all state lives on the server, in-memory cache per session
 
 (function () {
   'use strict';
 
   let _apiBase         = null;
-  let _currentPrefix   = null;
-  let _pushTimer       = null;
-  let _heartbeatTimer  = null;
   let _cachedDeviceId  = null;
   let _cachedBasicAuth = null;
+  let _state           = null; // { prefix, queue, csv_data, csv_updated_at }
 
   // ----------------------------------------------------------------
   // Device identity
@@ -38,9 +36,9 @@
     else if (ua.includes('Safari/')) browser = 'Safari';
 
     let os = 'OS';
-    if (ua.includes('Windows'))      os = 'Win';
+    if (ua.includes('Windows'))        os = 'Win';
     else if (ua.includes('Macintosh')) os = 'Mac';
-    else if (ua.includes('Linux'))   os = 'Linux';
+    else if (ua.includes('Linux'))     os = 'Linux';
 
     const suffix   = deviceId.slice(-4).toUpperCase();
     const userPart = username ? `${username}-` : '';
@@ -48,7 +46,7 @@
   }
 
   // ----------------------------------------------------------------
-  // Credentials: always required, prompt if missing
+  // Credentials
   // ----------------------------------------------------------------
 
   async function getApiBase() {
@@ -132,7 +130,7 @@
   }
 
   // ----------------------------------------------------------------
-  // Sync status indicator (fix #1)
+  // Sync status indicator
   // ----------------------------------------------------------------
 
   function getSyncIndicator() {
@@ -165,7 +163,6 @@
     el.style.opacity     = '1';
     el.textContent       = `${s.icon} Sync: ${message}`;
 
-    // Auto-fade "ok" after 4s
     if (state === 'ok') {
       setTimeout(() => { el.style.opacity = '0.4'; }, 4000);
     }
@@ -228,274 +225,70 @@
   }
 
   // ----------------------------------------------------------------
-  // Queue merge logic (fix #3: track whether anything actually changed)
+  // State management — DB is the source of truth, _state is the
+  // in-memory cache for the current browser session
   // ----------------------------------------------------------------
 
-  function mergeQueues(local, remote) {
-    const merged  = [...local];
-    let   changed = false;
-
-    remote.forEach((remotePatient) => {
-      const key = window.getPatientKey(
-        remotePatient.patientInfo?.idPrefix,
-        remotePatient.patientInfo?.nume
-      );
-
-      const localIdx = merged.findIndex(
-        (p) => window.getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === key
-      );
-
-      if (localIdx === -1) {
-        merged.push(remotePatient);
-        changed = true;
-      } else {
-        const localP              = merged[localIdx];
-        const mergedExportedTests = { ...(remotePatient.exportedTests || {}) };
-
-        Object.entries(localP.exportedTests || {}).forEach(([k, v]) => {
-          if (!mergedExportedTests[k] || v > mergedExportedTests[k]) {
-            mergedExportedTests[k] = v;
-          }
-        });
-
-        const newExported   = localP.exported    || remotePatient.exported;
-        const newExportedAt = Math.max(localP.exportedAt || 0, remotePatient.exportedAt || 0) || null;
-        const newNeeds      = localP.needsReexport || remotePatient.needsReexport;
-
-        // Only mark changed if something actually differs (fix #3)
-        if (
-          JSON.stringify(localP.exportedTests) !== JSON.stringify(mergedExportedTests) ||
-          localP.exported    !== newExported   ||
-          localP.exportedAt  !== newExportedAt ||
-          localP.needsReexport !== newNeeds
-        ) {
-          changed = true;
-        }
-
-        merged[localIdx] = {
-          ...localP,
-          exportedTests: mergedExportedTests,
-          exported:      newExported,
-          exportedAt:    newExportedAt,
-          needsReexport: newNeeds,
-          excluded:      localP.excluded,
-        };
-      }
-    });
-
-    return { queue: merged, changed };
+  function getCachedState() {
+    return _state;
   }
 
-  // ----------------------------------------------------------------
-  // Pull: fetch server state and merge with local
-  // ----------------------------------------------------------------
-
-  async function pullState(prefix) {
-    if (!prefix) return false;
-    setSyncStatus('syncing', `Pulling ${prefix}...`);
-    console.log(`[Sync] Pulling state for series: ${prefix}`);
+  async function loadState(prefix) {
+    if (!prefix) return;
+    setSyncStatus('syncing', `Loading ${prefix}...`);
+    console.log(`[Sync] Loading state for series: ${prefix}`);
 
     const result = await apiCall('GET', `state&prefix=${encodeURIComponent(prefix)}`);
     if (!result || !result.success) {
-      setSyncStatus('error', 'Pull failed');
-      console.warn('[Sync] Pull failed or no server data for this series');
-      return false;
+      setSyncStatus('error', 'Load failed');
+      console.warn('[Sync] Failed to load state from server');
+      return;
     }
 
-    let changed = false;
+    _state = {
+      prefix,
+      queue:          result.export_queue   || [],
+      csv_data:       result.csv_data        || null,
+      csv_updated_at: result.csv_updated_at  || null,
+    };
 
-    // Merge patient queue only if server has data and merge produces changes (fix #3)
-    if (result.export_queue && result.export_queue.length > 0) {
-      const localQueue          = await window.loadQueueFromStorage();
-      const { queue: merged, changed: queueChanged } = mergeQueues(localQueue, result.export_queue);
-
-      if (queueChanged) {
-        window._syncPulling = true;
-        await window.saveQueueToStorage(merged);
-        window._syncPulling = false;
-        changed = true;
-        console.log(`[Sync] Merged ${result.export_queue.length} patients from server (queue updated)`);
-      } else {
-        console.log(`[Sync] Pulled ${result.export_queue.length} patients - no changes`);
-      }
-    }
-
-    // Merge CSV data (server wins if it has a newer timestamp)
-    if (result.csv_updated_at) {
-      const localKey       = `sante-csv-${prefix}`;
-      const localRaw       = localStorage.getItem(localKey);
-      const localTimestamp = localRaw ? (JSON.parse(localRaw).timestamp || 0) : 0;
-
-      if (result.csv_updated_at > localTimestamp) {
-        if (result.csv_data) {
-          localStorage.setItem(localKey, JSON.stringify({
-            data:      result.csv_data,
-            timestamp: result.csv_updated_at,
-            count:     result.csv_data.length,
-          }));
-          console.log(`[Sync] CSV data updated from server for ${prefix}`);
-        } else {
-          localStorage.removeItem(localKey);
-          localStorage.setItem(`sante-cleared-${prefix}`, result.csv_updated_at.toString());
-          window.csvPatientData = [];
-          console.log(`[Sync] CSV data cleared from server signal for ${prefix}`);
-        }
-        changed = true;
-      }
-    }
-
-    setSyncStatus('ok', `Synced ${prefix}`);
-    return changed;
+    const csvInfo = _state.csv_data ? `${_state.csv_data.length} CSV rows` : 'no CSV';
+    setSyncStatus('ok', `Loaded ${prefix}`);
+    console.log(`[Sync] Loaded ${_state.queue.length} patients, ${csvInfo}`);
   }
 
-  // ----------------------------------------------------------------
-  // Push: send local state to server
-  // ----------------------------------------------------------------
-
-  async function pushState(prefix) {
+  async function saveState(prefix, queue, csvData, csvUpdatedAt) {
     if (!prefix) return;
-    setSyncStatus('syncing', `Pushing ${prefix}...`);
-    console.log(`[Sync] Pushing state for series: ${prefix}`);
 
-    const queue       = await window.loadQueueFromStorage();
-    const prefixQueue = queue.filter(
-      (p) => (p.patientInfo?.idPrefix || '').toLowerCase() === prefix.toLowerCase()
-    );
+    // Update cache immediately so reads see the new value right away
+    _state = { prefix, queue, csv_data: csvData || null, csv_updated_at: csvUpdatedAt || null };
 
-    const localKey   = `sante-csv-${prefix}`;
-    const localRaw   = localStorage.getItem(localKey);
-    const csvParsed  = localRaw ? JSON.parse(localRaw) : null;
-    const clearedAt  = localStorage.getItem(`sante-cleared-${prefix}`);
-    const csvUpdatedAt = csvParsed?.timestamp || (clearedAt ? parseInt(clearedAt) : null);
+    setSyncStatus('syncing', `Saving ${prefix}...`);
 
     const result = await apiCall('POST', 'state', {
       prefix,
-      export_queue:   prefixQueue,
-      csv_data:       csvParsed?.data || null,
-      csv_updated_at: csvUpdatedAt,
+      export_queue:   queue,
+      csv_data:       csvData        || null,
+      csv_updated_at: csvUpdatedAt   || null,
     });
 
     if (result?.success) {
-      setSyncStatus('ok', `Synced ${prefix}`);
-      console.log(`[Sync] Push successful for series: ${prefix}`);
+      setSyncStatus('ok', `Saved ${prefix}`);
     } else {
-      setSyncStatus('error', 'Push failed');
-      console.warn('[Sync] Push failed');
+      setSyncStatus('error', 'Save failed');
+      console.warn('[Sync] Save failed');
     }
   }
 
-  function schedulePush() {
-    if (!_currentPrefix || window._syncPulling) return;
-    if (_pushTimer) clearTimeout(_pushTimer);
-    _pushTimer = setTimeout(() => {
-      pushState(_currentPrefix).catch(console.error);
-    }, 3000);
-  }
-
-  // ----------------------------------------------------------------
-  // Lock management
-  // ----------------------------------------------------------------
-
-  async function acquireLock(prefix) {
-    const result = await apiCall('POST', 'lock', { prefix });
-    if (result && !result.success && result.locked) {
-      showLockBanner(prefix, result.locked_by, result.locked_at);
-    } else if (result?.success) {
-      hideLockBanner();
-      startHeartbeat(prefix);
-    }
-    return result;
-  }
-
-  async function releaseLock(prefix) {
-    stopHeartbeat();
-    await apiCall('DELETE', 'lock', { prefix });
-  }
-
-  function startHeartbeat(prefix) {
-    stopHeartbeat();
-    _heartbeatTimer = setInterval(() => {
-      apiCall('POST', 'lock', { prefix }).catch(console.error);
-    }, 10 * 60 * 1000);
-  }
-
-  function stopHeartbeat() {
-    if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
-  }
-
-  // ----------------------------------------------------------------
-  // UI - Lock warning banner
-  // ----------------------------------------------------------------
-
-  function showLockBanner(prefix, lockedBy, lockedAt) {
-    let banner = document.getElementById('sante-sync-lock-banner');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'sante-sync-lock-banner';
-      banner.style.cssText = [
-        'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
-        'background:#c0392b', 'color:#fff', 'padding:10px 20px',
-        'display:flex', 'align-items:center', 'justify-content:space-between',
-        'font-size:14px', 'font-weight:bold', 'box-shadow:0 2px 8px rgba(0,0,0,.4)',
-      ].join(';');
-      document.body.appendChild(banner);
-    }
-
-    const time = lockedAt ? new Date(lockedAt).toLocaleTimeString('ro-RO') : '';
-    banner.innerHTML = `
-      <span>
-        &#9888; Series <strong>${prefix}</strong> is open by
-        <strong>${lockedBy}</strong>${time ? ` since ${time}` : ''}.
-        Be careful to avoid conflicts!
-      </span>
-      <button id="sante-sync-force-lock" style="
-        background:#fff; color:#c0392b; border:none; padding:5px 14px;
-        border-radius:4px; cursor:pointer; font-weight:bold; margin-left:20px; white-space:nowrap;
-      ">Take over</button>
-    `;
-
-    document.getElementById('sante-sync-force-lock')?.addEventListener('click', async () => {
-      const result = await apiCall('POST', 'lock', { prefix, force: true });
-      if (result?.success) { hideLockBanner(); startHeartbeat(prefix); }
-    });
-  }
-
-  function hideLockBanner() {
-    document.getElementById('sante-sync-lock-banner')?.remove();
-  }
-
-  // ----------------------------------------------------------------
-  // Prefix management
-  // ----------------------------------------------------------------
-
-  async function setCurrentPrefix(prefix) {
-    if (_currentPrefix === prefix) return;
-    if (_currentPrefix) await releaseLock(_currentPrefix);
-
-    _currentPrefix = prefix;
+  async function setCurrentSeries(prefix) {
     if (!prefix) return;
-
     await apiCall('POST', 'series', { prefix });
-    const changed = await pullState(prefix);
-    if (changed) await window.syncUIWithLocalStorage();
-    await acquireLock(prefix);
+    console.log(`[Sync] Marked ${prefix} as current series`);
   }
 
   async function fetchCurrentSeries() {
     const result = await apiCall('GET', 'series');
     return result?.current?.prefix || null;
-  }
-
-  // ----------------------------------------------------------------
-  // Full sync on every page load (fix #4: runs after UI is ready)
-  // ----------------------------------------------------------------
-
-  async function forceSync(prefix) {
-    if (!prefix) return;
-    _currentPrefix = prefix;
-    await apiCall('POST', 'series', { prefix });
-    await pullState(prefix);
-    await acquireLock(prefix);
   }
 
   // ----------------------------------------------------------------
@@ -507,6 +300,7 @@
     await getApiBase();
     await getBasicAuth();
     const name = await getDeviceName();
+    setSyncStatus('idle', 'Ready');
     console.log('[Sync] SyncManager initialized, device:', name);
   }
 
@@ -516,17 +310,15 @@
 
   const SyncManager = {
     init,
-    forceSync,
-    pullState,
-    pushState,
-    schedulePush,
-    acquireLock,
-    releaseLock,
-    setCurrentPrefix,
+    loadState,
+    saveState,
+    getCachedState,
+    setCurrentSeries,
     fetchCurrentSeries,
     resetCredentials,
     getDeviceId,
     getDeviceName,
+    setSyncStatus,
   };
 
   window.SyncManager = SyncManager;

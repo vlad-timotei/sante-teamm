@@ -1,116 +1,45 @@
-// CSV Handler v1.0.0
+// CSV Handler v2.0.0
 // CSV upload, parsing, and patient matching functions
 
 window.csvPatientData = [];
 
-function getStoredCSVKey(idPrefix) {
-  return `sante-csv-${idPrefix}`;
-}
-
-function storeCSVData(idPrefix, csvData) {
-  const key = getStoredCSVKey(idPrefix);
-  try {
-    localStorage.setItem(
-      key,
-      JSON.stringify({
-        data: csvData,
-        timestamp: Date.now(),
-        count: csvData.length,
-      })
-    );
-    console.log(
-      `💾 Stored CSV data for prefix ${idPrefix}: ${csvData.length} patients`
-    );
-    window.SyncManager?.schedulePush();
-  } catch (error) {
-    console.error("Failed to store CSV data:", error);
-  }
+async function storeCSVData(idPrefix, csvData) {
+  const state = window.SyncManager?.getCachedState();
+  await window.SyncManager.saveState(
+    idPrefix,
+    state?.queue || [],
+    csvData,
+    Date.now()
+  );
+  console.log(`💾 Stored CSV data for prefix ${idPrefix}: ${csvData.length} patients`);
 }
 
 function getStoredCSVData(idPrefix) {
-  const key = getStoredCSVKey(idPrefix);
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      console.log(
-        `📱 Retrieved stored CSV data for prefix ${idPrefix}: ${
-          parsed.count
-        } patients (stored ${new Date(parsed.timestamp).toLocaleString()})`
-      );
-      return parsed.data;
-    }
-  } catch (error) {
-    console.error("Failed to retrieve CSV data:", error);
+  const state = window.SyncManager?.getCachedState();
+  if (state?.prefix === idPrefix && state.csv_data) {
+    console.log(`📱 Retrieved CSV data for prefix ${idPrefix}: ${state.csv_data.length} patients`);
+    return state.csv_data;
   }
   return null;
 }
 
-function clearStoredCSVData(idPrefix) {
-  const key = getStoredCSVKey(idPrefix);
-  localStorage.removeItem(key);
-  // Store a cleared-at timestamp so other devices know to clear too
-  localStorage.setItem(`sante-cleared-${idPrefix}`, Date.now().toString());
-  console.log(`🗑️ Cleared stored CSV data for prefix ${idPrefix}`);
-  window.SyncManager?.schedulePush();
+async function clearStoredCSVData(idPrefix) {
+  const state = window.SyncManager?.getCachedState();
+  await window.SyncManager.saveState(
+    idPrefix,
+    state?.queue || [],
+    null,
+    Date.now()
+  );
+  console.log(`🗑️ Cleared CSV data for prefix ${idPrefix}`);
 }
 
 function tryLoadAnyStoredData() {
-  console.log("🔍 Trying to load any available stored CSV data...");
-
   const idPrefixInput = document.getElementById("id-prefix");
-  if (idPrefixInput && idPrefixInput.value.trim()) {
+  if (idPrefixInput?.value.trim()) {
     checkForStoredCSVData();
-    return;
   }
-
-  console.log(
-    "🔍 No ID prefix set, scanning localStorage for any stored CSV data..."
-  );
-
-  const storedPrefixes = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith("sante-csv-")) {
-      const prefix = key.replace("sante-csv-", "");
-      storedPrefixes.push(prefix);
-    }
-  }
-
-  console.log(
-    `Found ${storedPrefixes.length} stored prefixes:`,
-    storedPrefixes
-  );
-
-  if (storedPrefixes.length > 0) {
-    let mostRecentPrefix = storedPrefixes[0];
-    let mostRecentTime = 0;
-
-    storedPrefixes.forEach((prefix) => {
-      const data = getStoredCSVData(prefix);
-      if (data) {
-        const key = getStoredCSVKey(prefix);
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.timestamp > mostRecentTime) {
-            mostRecentTime = parsed.timestamp;
-            mostRecentPrefix = prefix;
-          }
-        }
-      }
-    });
-
-    console.log(
-      `📅 Loading most recent CSV data for prefix: ${mostRecentPrefix}`
-    );
-    if (idPrefixInput) {
-      idPrefixInput.value = mostRecentPrefix;
-    }
-    checkForStoredCSVData();
-  } else {
-    console.log("❌ No stored CSV data found in localStorage");
-  }
+  // If no prefix, content.js init handles fetching current series from server
 }
 
 function checkForStoredCSVData() {
@@ -190,7 +119,7 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
           e.preventDefault();
           e.stopPropagation();
 
-          clearStoredCSVData(idPrefix);
+          await clearStoredCSVData(idPrefix);
           window.csvPatientData = [];
           updateCSVButton("", 0, false);
 
@@ -276,8 +205,19 @@ async function handleCSVUpload(event) {
     const detectedPrefix = autoDetectIdPrefix(window.csvPatientData);
 
     if (detectedPrefix) {
+      // Ensure state is loaded for this prefix before saving CSV
+      if (window.SyncManager?.getCachedState()?.prefix !== detectedPrefix) {
+        await window.SyncManager.loadState(detectedPrefix);
+        // If load failed, _state.prefix won't match — abort to avoid data loss
+        if (window.SyncManager?.getCachedState()?.prefix !== detectedPrefix) {
+          alert(`Failed to load series "${detectedPrefix}" from server. Check your connection and try again.`);
+          return;
+        }
+        await window.SyncManager.setCurrentSeries(detectedPrefix);
+      }
       await storeCSVData(detectedPrefix, window.csvPatientData);
       updateCSVButton(detectedPrefix, window.csvPatientData.length, true);
+      await window.syncUIWithLocalStorage?.();
     }
 
     const matchResults = matchCSVToTablePatients(window.csvPatientData);
@@ -782,7 +722,6 @@ function findBatchButtonForInput(input) {
 }
 
 // Export to window (csvPatientData is already on window from line 4)
-window.getStoredCSVKey = getStoredCSVKey;
 window.storeCSVData = storeCSVData;
 window.getStoredCSVData = getStoredCSVData;
 window.clearStoredCSVData = clearStoredCSVData;
