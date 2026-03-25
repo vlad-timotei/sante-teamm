@@ -63,7 +63,7 @@ async function initializeBatchExtension() {
 async function syncUIWithLocalStorage() {
   console.log("🔄 Syncing UI with localStorage...");
 
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
   console.log(`📦 Found ${queue.length} patients in localStorage`);
 
   const table = document.getElementById("ctl00_contentMain_dgGrid");
@@ -209,7 +209,7 @@ async function syncUIWithLocalStorage() {
   });
 
   if (statusChangesDetected > 0) {
-    await window.saveQueueToStorage(queue);
+    await window.saveQueueToDB(queue);
     console.log(`💾 Saved ${statusChangesDetected} status change(s) to storage`);
 
     window.showSuccessToast(

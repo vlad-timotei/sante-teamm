@@ -129,7 +129,7 @@ async function exportData() {
   await storeFileForUpload(csvContent, filename);
 
   const exportTimestamp = Date.now();
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
   const exportedKeys = new Set(
     patientsToExport.map((p) =>
       window.getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume)
@@ -159,7 +159,7 @@ async function exportData() {
     }
   });
 
-  await window.saveQueueToStorage(queue);
+  await window.saveQueueToDB(queue);
   await updateExportCount();
   await window.syncUIWithLocalStorage();
 
@@ -248,7 +248,7 @@ async function storeFileForUpload(content, filename) {
 }
 
 async function updateExportCount() {
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
 
   const patientsWithUnexportedTests = queue.filter((p) => {
     if (p.excluded === true) return false;
@@ -302,7 +302,7 @@ async function updateDownloadCount() {
     return;
   }
 
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
   const existingKeys = new Set(
     queue.map((p) =>
       window.getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume)

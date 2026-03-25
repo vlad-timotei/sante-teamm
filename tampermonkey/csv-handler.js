@@ -1,4 +1,4 @@
-// CSV Handler v2.0.0
+// CSV Handler v2.1.0
 // CSV upload, parsing, and patient matching functions
 
 window.csvPatientData = [];
@@ -213,9 +213,9 @@ async function handleCSVUpload(event) {
           alert(`Failed to load series "${detectedPrefix}" from server. Check your connection and try again.`);
           return;
         }
-        await window.SyncManager.setCurrentSeries(detectedPrefix);
       }
       await storeCSVData(detectedPrefix, window.csvPatientData);
+      await window.SyncManager.setCurrentSeries(detectedPrefix);
       updateCSVButton(detectedPrefix, window.csvPatientData.length, true);
       await window.syncUIWithLocalStorage?.();
     }

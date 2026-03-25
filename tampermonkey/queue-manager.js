@@ -1,4 +1,4 @@
-// Queue Manager v2.0.0
+// Queue Manager v2.1.0
 // Patient queue — reads from in-memory cache, writes to server via SyncManager
 
 function getPatientKey(idPrefix, patientName) {
@@ -8,14 +8,14 @@ function getPatientKey(idPrefix, patientName) {
   return `${normalizedPrefix}_${normalizedName}`;
 }
 
-async function loadQueueFromStorage() {
+async function loadQueueFromDB() {
   const state = window.SyncManager?.getCachedState();
   const queue = state?.queue || [];
   console.log(`📦 Loaded queue from storage: ${queue.length} patients`);
   return queue;
 }
 
-async function saveQueueToStorage(queue) {
+async function saveQueueToDB(queue) {
   const state = window.SyncManager?.getCachedState();
   if (!state?.prefix) {
     console.warn('💾 Cannot save queue: no active series loaded');
@@ -27,11 +27,12 @@ async function saveQueueToStorage(queue) {
     state.csv_data,
     state.csv_updated_at
   );
+  await window.SyncManager.setCurrentSeries(state.prefix);
   console.log(`💾 Saved queue to server: ${queue.length} patients`);
 }
 
 async function getQueueData() {
-  return await loadQueueFromStorage();
+  return await loadQueueFromDB();
 }
 
 async function clearQueue() {
@@ -54,7 +55,7 @@ async function resetExportedStatus() {
   if (!confirmed) return;
 
   try {
-    const queue = await loadQueueFromStorage();
+    const queue = await loadQueueFromDB();
     let resetCount = 0;
 
     queue.forEach((patient) => {
@@ -65,7 +66,7 @@ async function resetExportedStatus() {
       }
     });
 
-    await saveQueueToStorage(queue);
+    await saveQueueToDB(queue);
     await window.updateExportCount();
     await window.syncUIWithLocalStorage();
 
@@ -82,7 +83,7 @@ async function resetExportedStatus() {
 }
 
 async function migratePatientData() {
-  const queue = await loadQueueFromStorage();
+  const queue = await loadQueueFromDB();
   let migrated = 0;
 
   queue.forEach((patient) => {
@@ -131,7 +132,7 @@ async function migratePatientData() {
   });
 
   if (migrated > 0) {
-    await saveQueueToStorage(queue);
+    await saveQueueToDB(queue);
     console.log(`📦 Migrated ${migrated} patients to new data structure`);
   } else {
     console.log("📦 No patient data migration needed");
@@ -140,8 +141,8 @@ async function migratePatientData() {
 
 // Export to window
 window.getPatientKey = getPatientKey;
-window.loadQueueFromStorage = loadQueueFromStorage;
-window.saveQueueToStorage = saveQueueToStorage;
+window.loadQueueFromDB = loadQueueFromDB;
+window.saveQueueToDB = saveQueueToDB;
 window.getQueueData = getQueueData;
 window.clearQueue = clearQueue;
 window.resetExportedStatus = resetExportedStatus;

@@ -1,4 +1,4 @@
-// Batch Processor v1.1.0
+// Batch Processor v1.2.0
 // Batch processing, PDF download, and analysis functions
 
 // Global state for batch processing (using window.* to avoid shadowing issues)
@@ -86,7 +86,7 @@ async function addToBatch(element, index, batchBtn) {
   const patientName = patientData.nume.trim();
   const patientKey = window.getPatientKey(idPrefix, patientName);
 
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
   const existingPatient = queue.find(
     (p) =>
       window.getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
@@ -139,11 +139,11 @@ async function addToBatch(element, index, batchBtn) {
       );
 
       if (window.currentPageAnalysis.completed === window.currentPageAnalysis.total) {
-        await window.saveQueueToStorage(queue);
+        await window.saveQueueToDB(queue);
         await finishBatchAnalysis();
       }
     } else {
-      await window.saveQueueToStorage(queue);
+      await window.saveQueueToDB(queue);
       await window.updateExportCount();
     }
 
@@ -202,7 +202,7 @@ async function addToBatch(element, index, batchBtn) {
         }
       } else {
         queue.push(extractedItem);
-        await window.saveQueueToStorage(queue);
+        await window.saveQueueToDB(queue);
 
         console.log(
           `%c✅ SAVED TO LOCALSTORAGE: ${extractedItem.patientInfo?.nume}`,
@@ -283,7 +283,7 @@ async function removeFromBatch(element, index, batchBtn) {
 
   const patientKey = window.getPatientKey(idPrefix, patientName);
 
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
   const patient = queue.find(
     (p) =>
       window.getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
@@ -291,7 +291,7 @@ async function removeFromBatch(element, index, batchBtn) {
 
   if (patient) {
     patient.excluded = true;
-    await window.saveQueueToStorage(queue);
+    await window.saveQueueToDB(queue);
     console.log(
       `%c🚫 MARKED AS EXCLUDED IN LOCALSTORAGE: ${patient.patientInfo.nume} (key: ${patientKey})`,
       "color: gray; font-weight: bold"
@@ -508,7 +508,7 @@ async function analyzeCurrentPage() {
     return;
   }
 
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
   const existingKeys = new Set(
     queue.map((p) =>
       window.getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume)
@@ -650,7 +650,7 @@ async function refetchPatientData(patientKey, rowElement) {
     return;
   }
 
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
   const existingPatient = queue.find(
     (p) => window.getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
   );
@@ -722,7 +722,7 @@ async function refetchPatientData(patientKey, rowElement) {
         console.log(`📋 Patient marked for re-export (${newTestsFound} new tests found)`);
       }
 
-      await window.saveQueueToStorage(queue);
+      await window.saveQueueToDB(queue);
 
       rowElement.style.backgroundColor = "";
 
@@ -956,6 +956,7 @@ async function downloadAndProcessPDF(downloadLink, batchItem, skipUIUpdate = fal
               hasError: !!extractedPDFData.error,
             });
 
+            extractedPDFData.id = batchItem.id;
             extractedPDFData.exported = false;
             extractedPDFData.exportedAt = null;
             extractedPDFData.exportedTests = {};
@@ -1102,7 +1103,7 @@ function updateAnalysisProgress() {
 async function finishBatchAnalysis() {
   console.log("🎉 Batch analysis complete! Saving to localStorage...");
 
-  const queue = await window.loadQueueFromStorage();
+  const queue = await window.loadQueueFromDB();
 
   const existingKeys = new Set(
     queue.map((p) =>
@@ -1116,7 +1117,7 @@ async function finishBatchAnalysis() {
   });
 
   const merged = [...queue, ...newPatients];
-  await window.saveQueueToStorage(merged);
+  await window.saveQueueToDB(merged);
 
   console.log(
     `✅ Saved ${newPatients.length} new patients to localStorage (${
