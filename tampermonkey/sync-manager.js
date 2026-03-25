@@ -405,17 +405,38 @@
     _currentPrefix = prefix;
     if (!prefix) return;
 
+    // Mark this prefix as the current active series on the server
+    await apiCall('POST', 'series', { prefix });
+
     const changed = await pullState(prefix);
     if (changed) await window.syncUIWithLocalStorage();
 
     await acquireLock(prefix);
   }
 
+  // Fetch current active series from server (used on fresh devices with no local data)
+  async function fetchCurrentSeries() {
+    const result = await apiCall('GET', 'series');
+    return result?.current?.prefix || null;
+  }
+
   // ----------------------------------------------------------------
   // Init
   // ----------------------------------------------------------------
 
+  // Full sync on every page load: pull latest state from server regardless of local data
+  async function forceSync(prefix) {
+    if (!prefix) return;
+    _currentPrefix = prefix;
+    await apiCall('POST', 'series', { prefix });
+    await pullState(prefix);
+    await acquireLock(prefix);
+  }
+
   async function init() {
+    // Eagerly prompt for credentials on first run so the user isn't surprised later
+    await getApiBase();
+    await getBasicAuth();
     const name = await getDeviceName();
     console.log('[Sync] SyncManager initialized, device:', name);
   }
@@ -426,12 +447,14 @@
 
   const SyncManager = {
     init,
+    forceSync,
     pullState,
     pushState,
     schedulePush,
     acquireLock,
     releaseLock,
     setCurrentPrefix,
+    fetchCurrentSeries,
     resetCredentials,
     getDeviceId,
     getDeviceName,

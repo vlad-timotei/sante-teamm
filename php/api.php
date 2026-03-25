@@ -57,9 +57,17 @@ $pdo->exec("
         export_queue   LONGTEXT,
         updated_at     DATETIME     NOT NULL,
         updated_by     VARCHAR(64),
-        device_name    VARCHAR(100)
+        device_name    VARCHAR(100),
+        is_current     TINYINT(1)   NOT NULL DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
+
+// Add is_current column if upgrading from older schema
+try {
+    $pdo->exec("ALTER TABLE series_state ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+    // Column already exists, ignore
+}
 
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS series_locks (
@@ -196,6 +204,28 @@ switch ($action) {
 
             $stmt = $pdo->prepare('DELETE FROM series_locks WHERE prefix = ? AND device_id = ?');
             $stmt->execute([$prefix, $deviceId]);
+            echo json_encode(['success' => true]);
+        }
+        break;
+
+    // ================================================================
+    // GET  ?action=series         -> returns the current active series
+    // POST ?action=series         -> marks a prefix as current
+    // ================================================================
+    case 'series':
+        if ($method === 'GET') {
+            $stmt = $pdo->query('SELECT prefix, updated_at FROM series_state WHERE is_current = 1 LIMIT 1');
+            $row  = $stmt->fetch(PDO::FETCH_ASSOC);
+            echo json_encode(['success' => true, 'current' => $row ?: null]);
+
+        } elseif ($method === 'POST') {
+            $body   = json_decode(file_get_contents('php://input'), true);
+            $prefix = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['prefix'] ?? ''), 0, 30);
+            if (!$prefix) { http_response_code(400); echo json_encode(['error' => 'Missing prefix']); exit; }
+
+            // Clear current flag on all, then set on this prefix
+            $pdo->exec("UPDATE series_state SET is_current = 0");
+            $pdo->prepare("UPDATE series_state SET is_current = 1 WHERE prefix = ?")->execute([$prefix]);
             echo json_encode(['success' => true]);
         }
         break;

@@ -60,12 +60,20 @@ async function initializeBatchExtension() {
         }
       });
 
-      // Daca exista deja un prefix setat la incarcare, activeaza sync
+      // On every page load: get prefix (local or server), then force a full sync
       setTimeout(async () => {
-        const prefix = idPrefixInput.value.trim();
+        let prefix = idPrefixInput.value.trim();
+        if (!prefix) {
+          prefix = await window.SyncManager.fetchCurrentSeries();
+          if (prefix) {
+            idPrefixInput.value = prefix;
+            console.log(`[Sync] Auto-loaded current series from server: ${prefix}`);
+          }
+        }
         if (prefix) {
-          await window.SyncManager.setCurrentPrefix(prefix);
+          await window.SyncManager.forceSync(prefix);
           await window.syncUIWithLocalStorage();
+          window.checkForStoredCSVData?.();
         }
       }, 2000);
     }
