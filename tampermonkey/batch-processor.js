@@ -77,7 +77,7 @@ async function addToBatch(element, index, batchBtn) {
 
   const patientData = {
     nrDoc: cells[0]?.textContent.trim(),
-    nume: cells[1]?.textContent.trim(),
+    nume: cells[1]?.textContent.trim().replace(/\s*\(CSV:.*$/, "").trim(),
     cnp: cells[2]?.textContent.trim(),
     dataNasterii: cells[3]?.textContent.trim(),
     unitateRecoltare: cells[4]?.textContent.trim(),
@@ -715,6 +715,7 @@ async function refetchPatientData(patientKey, rowElement) {
       existingPatient.structuredData.testResults = mergedTestResults;
       existingPatient.lastRefetchAt = Date.now();
       existingPatient.exportedTests = oldExportedTests;
+      delete existingPatient.extractedText;
 
       const statusIcon = rowElement?.querySelector(".glyphicon");
       if (statusIcon) {

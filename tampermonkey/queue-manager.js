@@ -3,7 +3,8 @@
 
 function getPatientKey(idPrefix, patientName) {
   const normalizedPrefix = (idPrefix || "").trim().toLowerCase();
-  const normalizedName = (patientName || "").trim().toLowerCase();
+  const cleanName = (patientName || "").replace(/\s*\(CSV:.*$/, "").trim();
+  const normalizedName = cleanName.toLowerCase();
   return `${normalizedPrefix}_${normalizedName}`;
 }
 
@@ -116,6 +117,11 @@ async function migratePatientData() {
 
     if (patient.needsReexport === undefined) {
       patient.needsReexport = false;
+      needsMigration = true;
+    }
+
+    if (patient.extractedText !== undefined) {
+      delete patient.extractedText;
       needsMigration = true;
     }
 

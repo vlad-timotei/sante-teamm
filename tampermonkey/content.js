@@ -127,7 +127,7 @@ async function syncUIWithLocalStorage() {
 
       const patientKey = window.getPatientKey(idPrefix, patientName);
 
-      if (storedPatient.excluded === false) {
+      if (storedPatient.excluded !== true) {
         batchBtn.textContent = "✓";
         batchBtn.style.background = "#28a745";
         batchBtn.setAttribute("data-batched", "true");

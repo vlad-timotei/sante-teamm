@@ -34,7 +34,6 @@ class PDFProcessor {
       const extractedData = {
         patientInfo: patientData,
         pageCount: pdf.numPages,
-        extractedText: "",
         structuredData: {},
         extractionDate: new Date().toISOString(),
       };
@@ -59,10 +58,7 @@ class PDFProcessor {
         console.log("Page", pageNum, "text length:", pageText.length);
       }
 
-      extractedData.extractedText = fullText;
       console.log("Full extracted text length:", fullText.length);
-      console.log("First 500 chars:", fullText.substring(0, 500));
-
       extractedData.structuredData = this.extractMedicalData(fullText, patientData);
       console.log("Structured data:", extractedData.structuredData);
 
