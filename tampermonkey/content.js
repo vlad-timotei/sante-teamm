@@ -43,25 +43,31 @@ async function initializeBatchExtension() {
       await window.syncUIWithLocalStorage();
     }, 1500);
 
-    // Check for stored CSV data after everything is set up
+    // Check for stored CSV data after everything is set up (fix #4: runs before server sync)
     setTimeout(() => {
       window.tryLoadAnyStoredData();
     }, 500);
 
-    // Urmareste schimbarile prefixului si declanseaza sync cu serverul
     const idPrefixInput = document.getElementById('id-prefix');
     if (idPrefixInput) {
+      // Manual prefix change: setCurrentPrefix handles pull + lock
       idPrefixInput.addEventListener('change', async () => {
         const prefix = idPrefixInput.value.trim();
         if (prefix) {
+          window._serverSyncDone = true; // prevent timeout from re-running
           await window.SyncManager.setCurrentPrefix(prefix);
           await window.syncUIWithLocalStorage();
           window.checkForStoredCSVData?.();
         }
       });
 
-      // On every page load: get prefix (local or server), then force a full sync
+      // On every page load: full server sync after local data is ready (fix #4: 2500ms > 500ms local load)
+      // _serverSyncDone prevents double-run if change event fires before the timeout
+      window._serverSyncDone = false;
       setTimeout(async () => {
+        if (window._serverSyncDone) return;
+        window._serverSyncDone = true;
+
         let prefix = idPrefixInput.value.trim();
         if (!prefix) {
           prefix = await window.SyncManager.fetchCurrentSeries();
@@ -75,7 +81,7 @@ async function initializeBatchExtension() {
           await window.syncUIWithLocalStorage();
           window.checkForStoredCSVData?.();
         }
-      }, 2000);
+      }, 2500);
     }
   }
 }

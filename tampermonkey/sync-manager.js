@@ -1,15 +1,15 @@
-// Sync Manager v1.1.0
+// Sync Manager v1.2.0
 // Centralized sync with the PHP server for multi-device teams
 
 (function () {
   'use strict';
 
-  let _apiBase         = null; // set at runtime from GM storage
+  let _apiBase         = null;
   let _currentPrefix   = null;
   let _pushTimer       = null;
   let _heartbeatTimer  = null;
   let _cachedDeviceId  = null;
-  let _cachedBasicAuth = null; // base64(username:password), cached after first login
+  let _cachedBasicAuth = null;
 
   // ----------------------------------------------------------------
   // Device identity
@@ -32,24 +32,23 @@
     const ua = navigator.userAgent;
 
     let browser = 'Browser';
-    if (ua.includes('Firefox/'))   browser = 'Firefox';
-    else if (ua.includes('Edg/'))  browser = 'Edge';
+    if (ua.includes('Firefox/'))     browser = 'Firefox';
+    else if (ua.includes('Edg/'))    browser = 'Edge';
     else if (ua.includes('Chrome/')) browser = 'Chrome';
     else if (ua.includes('Safari/')) browser = 'Safari';
 
     let os = 'OS';
-    if (ua.includes('Windows'))    os = 'Win';
+    if (ua.includes('Windows'))      os = 'Win';
     else if (ua.includes('Macintosh')) os = 'Mac';
-    else if (ua.includes('Linux')) os = 'Linux';
+    else if (ua.includes('Linux'))   os = 'Linux';
 
-    // Last 4 chars of deviceId as unique suffix
-    const suffix = deviceId.slice(-4).toUpperCase();
+    const suffix   = deviceId.slice(-4).toUpperCase();
     const userPart = username ? `${username}-` : '';
     return `${userPart}${browser}-${os}-${suffix}`;
   }
 
   // ----------------------------------------------------------------
-  // Credentials: prompt once, store in GM (never in localStorage)
+  // Credentials: always required, prompt if missing
   // ----------------------------------------------------------------
 
   async function getApiBase() {
@@ -60,8 +59,11 @@
         'Sante Sync - API URL:\n' +
         '(Ask your administrator for this URL - it is not public)'
       );
-      if (!url || !url.trim()) return null;
-      url = url.trim().replace(/\/$/, ''); // strip trailing slash
+      if (!url || !url.trim()) {
+        setSyncStatus('error', 'No API URL - sync disabled');
+        return null;
+      }
+      url = url.trim().replace(/\/$/, '');
       await GM.setValue('sante-api-url', url);
     }
     _apiBase = url;
@@ -76,15 +78,22 @@
 
     if (!username || !password) {
       username = prompt('Sante Sync - Username:');
-      if (!username) return null;
+      if (!username) {
+        setSyncStatus('error', 'No credentials - sync disabled');
+        return null;
+      }
 
       password = prompt(`Sante Sync - Password for "${username}":`);
-      if (!password) return null;
+      if (!password) {
+        setSyncStatus('error', 'No credentials - sync disabled');
+        return null;
+      }
 
-      // Test credentials before saving
       const testAuth = btoa(`${username.trim()}:${password}`);
+      setSyncStatus('syncing', 'Verifying credentials...');
       const ok = await testCredentials(testAuth);
       if (!ok) {
+        setSyncStatus('error', 'Invalid username or password');
         alert('Sante Sync: Invalid username or password. Try again.');
         return null;
       }
@@ -113,13 +122,53 @@
     });
   }
 
-  // Force re-login and re-setup (clears all stored config)
   async function resetCredentials() {
     await GM.deleteValue('sante-username');
     await GM.deleteValue('sante-password');
     await GM.deleteValue('sante-api-url');
     _cachedBasicAuth = null;
     _apiBase         = null;
+    setSyncStatus('idle', 'Credentials cleared');
+  }
+
+  // ----------------------------------------------------------------
+  // Sync status indicator (fix #1)
+  // ----------------------------------------------------------------
+
+  function getSyncIndicator() {
+    let el = document.getElementById('sante-sync-status');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sante-sync-status';
+      el.style.cssText = [
+        'position:fixed', 'bottom:12px', 'right:12px', 'z-index:99998',
+        'padding:5px 12px', 'border-radius:20px', 'font-size:12px',
+        'font-weight:bold', 'box-shadow:0 2px 6px rgba(0,0,0,.25)',
+        'transition:opacity .4s', 'cursor:default',
+      ].join(';');
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  function setSyncStatus(state, message) {
+    const el = getSyncIndicator();
+    const styles = {
+      syncing: { bg: '#f0a500', color: '#fff', icon: '↻' },
+      ok:      { bg: '#27ae60', color: '#fff', icon: '✓' },
+      error:   { bg: '#c0392b', color: '#fff', icon: '✗' },
+      idle:    { bg: '#95a5a6', color: '#fff', icon: '·' },
+    };
+    const s = styles[state] || styles.idle;
+    el.style.background  = s.bg;
+    el.style.color       = s.color;
+    el.style.opacity     = '1';
+    el.textContent       = `${s.icon} Sync: ${message}`;
+
+    // Auto-fade "ok" after 4s
+    if (state === 'ok') {
+      setTimeout(() => { el.style.opacity = '0.4'; }, 4000);
+    }
   }
 
   // ----------------------------------------------------------------
@@ -149,9 +198,9 @@
         data: data ? JSON.stringify(data) : undefined,
         timeout: 15000,
         onload: (response) => {
-          // If credentials were rejected, clear cache and let user retry next time
           if (response.status === 401) {
             _cachedBasicAuth = null;
+            setSyncStatus('error', 'Credentials rejected');
             console.warn('[Sync] Credentials rejected (401).');
             resolve(null);
             return;
@@ -159,22 +208,32 @@
           try {
             resolve(JSON.parse(response.responseText));
           } catch {
+            setSyncStatus('error', 'Invalid server response');
             console.warn('[Sync] Invalid server response:', response.responseText);
             resolve(null);
           }
         },
-        onerror:   (err) => { console.error('[Sync] Network error:', err); resolve(null); },
-        ontimeout: ()    => { console.warn('[Sync] Request timed out'); resolve(null); },
+        onerror: (err) => {
+          setSyncStatus('error', 'Network error');
+          console.error('[Sync] Network error:', err);
+          resolve(null);
+        },
+        ontimeout: () => {
+          setSyncStatus('error', 'Timeout');
+          console.warn('[Sync] Request timed out');
+          resolve(null);
+        },
       });
     });
   }
 
   // ----------------------------------------------------------------
-  // Queue merge logic
+  // Queue merge logic (fix #3: track whether anything actually changed)
   // ----------------------------------------------------------------
 
   function mergeQueues(local, remote) {
-    const merged = [...local];
+    const merged  = [...local];
+    let   changed = false;
 
     remote.forEach((remotePatient) => {
       const key = window.getPatientKey(
@@ -187,12 +246,10 @@
       );
 
       if (localIdx === -1) {
-        // Patient exists only on server (added by another device)
         merged.push(remotePatient);
+        changed = true;
       } else {
-        // Merge export status: keep local (has full structuredData),
-        // but take the most recent exportedTests timestamp from either side
-        const localP = merged[localIdx];
+        const localP              = merged[localIdx];
         const mergedExportedTests = { ...(remotePatient.exportedTests || {}) };
 
         Object.entries(localP.exportedTests || {}).forEach(([k, v]) => {
@@ -201,18 +258,32 @@
           }
         });
 
+        const newExported   = localP.exported    || remotePatient.exported;
+        const newExportedAt = Math.max(localP.exportedAt || 0, remotePatient.exportedAt || 0) || null;
+        const newNeeds      = localP.needsReexport || remotePatient.needsReexport;
+
+        // Only mark changed if something actually differs (fix #3)
+        if (
+          JSON.stringify(localP.exportedTests) !== JSON.stringify(mergedExportedTests) ||
+          localP.exported    !== newExported   ||
+          localP.exportedAt  !== newExportedAt ||
+          localP.needsReexport !== newNeeds
+        ) {
+          changed = true;
+        }
+
         merged[localIdx] = {
           ...localP,
           exportedTests: mergedExportedTests,
-          exported:    localP.exported    || remotePatient.exported,
-          exportedAt:  Math.max(localP.exportedAt || 0, remotePatient.exportedAt || 0) || null,
-          needsReexport: localP.needsReexport || remotePatient.needsReexport,
-          excluded:    localP.excluded,
+          exported:      newExported,
+          exportedAt:    newExportedAt,
+          needsReexport: newNeeds,
+          excluded:      localP.excluded,
         };
       }
     });
 
-    return merged;
+    return { queue: merged, changed };
   }
 
   // ----------------------------------------------------------------
@@ -221,28 +292,32 @@
 
   async function pullState(prefix) {
     if (!prefix) return false;
+    setSyncStatus('syncing', `Pulling ${prefix}...`);
     console.log(`[Sync] Pulling state for series: ${prefix}`);
 
     const result = await apiCall('GET', `state&prefix=${encodeURIComponent(prefix)}`);
     if (!result || !result.success) {
+      setSyncStatus('error', 'Pull failed');
       console.warn('[Sync] Pull failed or no server data for this series');
       return false;
     }
 
     let changed = false;
 
-    // Merge patient queue
+    // Merge patient queue only if server has data and merge produces changes (fix #3)
     if (result.export_queue && result.export_queue.length > 0) {
-      const localQueue = await window.loadQueueFromStorage();
-      const merged = mergeQueues(localQueue, result.export_queue);
+      const localQueue          = await window.loadQueueFromStorage();
+      const { queue: merged, changed: queueChanged } = mergeQueues(localQueue, result.export_queue);
 
-      // _syncPulling flag prevents an immediate push after saving the pull result
-      window._syncPulling = true;
-      await window.saveQueueToStorage(merged);
-      window._syncPulling = false;
-
-      console.log(`[Sync] Merged ${result.export_queue.length} patients from server`);
-      changed = true;
+      if (queueChanged) {
+        window._syncPulling = true;
+        await window.saveQueueToStorage(merged);
+        window._syncPulling = false;
+        changed = true;
+        console.log(`[Sync] Merged ${result.export_queue.length} patients from server (queue updated)`);
+      } else {
+        console.log(`[Sync] Pulled ${result.export_queue.length} patients - no changes`);
+      }
     }
 
     // Merge CSV data (server wins if it has a newer timestamp)
@@ -253,7 +328,6 @@
 
       if (result.csv_updated_at > localTimestamp) {
         if (result.csv_data) {
-          // Server has newer CSV - update local
           localStorage.setItem(localKey, JSON.stringify({
             data:      result.csv_data,
             timestamp: result.csv_updated_at,
@@ -261,9 +335,8 @@
           }));
           console.log(`[Sync] CSV data updated from server for ${prefix}`);
         } else {
-          // Server has a newer "cleared" state - clear local too
           localStorage.removeItem(localKey);
-          localStorage.setItem(`sante-csv-cleared-${prefix}`, result.csv_updated_at.toString());
+          localStorage.setItem(`sante-cleared-${prefix}`, result.csv_updated_at.toString());
           window.csvPatientData = [];
           console.log(`[Sync] CSV data cleared from server signal for ${prefix}`);
         }
@@ -271,6 +344,7 @@
       }
     }
 
+    setSyncStatus('ok', `Synced ${prefix}`);
     return changed;
   }
 
@@ -280,6 +354,7 @@
 
   async function pushState(prefix) {
     if (!prefix) return;
+    setSyncStatus('syncing', `Pushing ${prefix}...`);
     console.log(`[Sync] Pushing state for series: ${prefix}`);
 
     const queue       = await window.loadQueueFromStorage();
@@ -290,9 +365,7 @@
     const localKey   = `sante-csv-${prefix}`;
     const localRaw   = localStorage.getItem(localKey);
     const csvParsed  = localRaw ? JSON.parse(localRaw) : null;
-    const clearedAt  = localStorage.getItem(`sante-csv-cleared-${prefix}`);
-
-    // If CSV was cleared locally, send the cleared-at timestamp so other devices know to clear too
+    const clearedAt  = localStorage.getItem(`sante-cleared-${prefix}`);
     const csvUpdatedAt = csvParsed?.timestamp || (clearedAt ? parseInt(clearedAt) : null);
 
     const result = await apiCall('POST', 'state', {
@@ -303,13 +376,14 @@
     });
 
     if (result?.success) {
+      setSyncStatus('ok', `Synced ${prefix}`);
       console.log(`[Sync] Push successful for series: ${prefix}`);
     } else {
+      setSyncStatus('error', 'Push failed');
       console.warn('[Sync] Push failed');
     }
   }
 
-  // Debounced push (fires 3s after the last local change)
   function schedulePush() {
     if (!_currentPrefix || window._syncPulling) return;
     if (_pushTimer) clearTimeout(_pushTimer);
@@ -319,19 +393,17 @@
   }
 
   // ----------------------------------------------------------------
-  // Lock management (prevent duplicate imports)
+  // Lock management
   // ----------------------------------------------------------------
 
   async function acquireLock(prefix) {
     const result = await apiCall('POST', 'lock', { prefix });
-
     if (result && !result.success && result.locked) {
       showLockBanner(prefix, result.locked_by, result.locked_at);
     } else if (result?.success) {
       hideLockBanner();
       startHeartbeat(prefix);
     }
-
     return result;
   }
 
@@ -342,7 +414,6 @@
 
   function startHeartbeat(prefix) {
     stopHeartbeat();
-    // Refresh lock every 10 min (lock expires after 30 min of inactivity)
     _heartbeatTimer = setInterval(() => {
       apiCall('POST', 'lock', { prefix }).catch(console.error);
     }, 10 * 60 * 1000);
@@ -394,37 +465,31 @@
   }
 
   // ----------------------------------------------------------------
-  // Active prefix change
+  // Prefix management
   // ----------------------------------------------------------------
 
   async function setCurrentPrefix(prefix) {
     if (_currentPrefix === prefix) return;
-
     if (_currentPrefix) await releaseLock(_currentPrefix);
 
     _currentPrefix = prefix;
     if (!prefix) return;
 
-    // Mark this prefix as the current active series on the server
     await apiCall('POST', 'series', { prefix });
-
     const changed = await pullState(prefix);
     if (changed) await window.syncUIWithLocalStorage();
-
     await acquireLock(prefix);
   }
 
-  // Fetch current active series from server (used on fresh devices with no local data)
   async function fetchCurrentSeries() {
     const result = await apiCall('GET', 'series');
     return result?.current?.prefix || null;
   }
 
   // ----------------------------------------------------------------
-  // Init
+  // Full sync on every page load (fix #4: runs after UI is ready)
   // ----------------------------------------------------------------
 
-  // Full sync on every page load: pull latest state from server regardless of local data
   async function forceSync(prefix) {
     if (!prefix) return;
     _currentPrefix = prefix;
@@ -433,8 +498,12 @@
     await acquireLock(prefix);
   }
 
+  // ----------------------------------------------------------------
+  // Init
+  // ----------------------------------------------------------------
+
   async function init() {
-    // Eagerly prompt for credentials on first run so the user isn't surprised later
+    setSyncStatus('syncing', 'Connecting...');
     await getApiBase();
     await getBasicAuth();
     const name = await getDeviceName();
@@ -462,7 +531,6 @@
 
   window.SyncManager = SyncManager;
 
-  // Also expose on the page window so it's callable from the browser console
   if (typeof unsafeWindow !== 'undefined') {
     unsafeWindow.SyncManager = SyncManager;
   }

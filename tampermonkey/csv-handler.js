@@ -50,7 +50,7 @@ function clearStoredCSVData(idPrefix) {
   const key = getStoredCSVKey(idPrefix);
   localStorage.removeItem(key);
   // Store a cleared-at timestamp so other devices know to clear too
-  localStorage.setItem(`sante-csv-cleared-${idPrefix}`, Date.now().toString());
+  localStorage.setItem(`sante-cleared-${idPrefix}`, Date.now().toString());
   console.log(`🗑️ Cleared stored CSV data for prefix ${idPrefix}`);
   window.SyncManager?.schedulePush();
 }

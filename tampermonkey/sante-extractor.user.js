@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sante PDF Batch Extractor
 // @namespace    https://github.com/vlad-timotei/sante-teamm
-// @version      1.2.2
+// @version      1.2.3
 // @description  Batch extract data from PDFs on rezultateptmedici.clinica-sante.ro
 // @author       Vlad T
 // @match        *://rezultateptmedici.clinica-sante.ro/*
@@ -30,34 +30,36 @@
 // @noframes
 // ==/UserScript==
 
-(function() {
-  'use strict';
+(function () {
+  "use strict";
 
-  console.log('🚀 Sante PDF Batch Extractor v1.1.1 loaded');
+  console.log("🚀 Sante PDF Batch Extractor loaded");
 
   // Make pdfjsLib available globally
-  if (typeof pdfjsLib !== 'undefined') {
+  if (typeof pdfjsLib !== "undefined") {
     window.pdfjsLib = pdfjsLib;
   }
 
   // Determine which page we're on and run appropriate code
   const currentURL = window.location.href;
 
-  if (currentURL.includes('rezultateptmedici.clinica-sante.ro')) {
-    console.log('📋 Running on Clinica Sante portal');
+  if (currentURL.includes("rezultateptmedici.clinica-sante.ro")) {
+    console.log("📋 Running on Clinica Sante portal");
     // Initialize the main extension
-    if (typeof window.initializeBatchExtension === 'function') {
+    if (typeof window.initializeBatchExtension === "function") {
       window.initializeBatchExtension();
     } else {
-      console.error('❌ initializeBatchExtension not found');
+      console.error("❌ initializeBatchExtension not found");
     }
-  } else if (currentURL.includes('teamm.work/admin/guests/intake-values-import-dumbrava')) {
-    console.log('📤 Running on Teamm.work upload page');
+  } else if (
+    currentURL.includes("teamm.work/admin/guests/intake-values-import-dumbrava")
+  ) {
+    console.log("📤 Running on Teamm.work upload page");
     // Start the auto-upload process
-    if (typeof window.startUploadWithDelay === 'function') {
+    if (typeof window.startUploadWithDelay === "function") {
       window.startUploadWithDelay();
     } else {
-      console.error('❌ startUploadWithDelay not found');
+      console.error("❌ startUploadWithDelay not found");
     }
   }
 })();
