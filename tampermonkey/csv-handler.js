@@ -1,4 +1,4 @@
-// CSV Handler v2.2.0
+// CSV Handler v2.3.0
 // CSV upload, parsing, and patient matching functions
 
 window.csvPatientData = [];
@@ -43,6 +43,14 @@ function tryLoadAnyStoredData() {
   // If no prefix, content.js init handles fetching current series from server
 }
 
+function clearPatientInputs() {
+  document.querySelectorAll('input[id^="patient-text-"]').forEach((input) => {
+    input.value = "";
+    input.style.backgroundColor = "";
+  });
+  document.querySelectorAll('.csv-match').forEach((el) => el.remove());
+}
+
 function checkForStoredCSVData() {
   console.log("🔍 Checking for stored CSV data...");
 
@@ -60,6 +68,8 @@ function checkForStoredCSVData() {
 
   console.log(`🔍 Looking for stored data for prefix: ${idPrefix}`);
   const storedData = getStoredCSVData(idPrefix);
+
+  clearPatientInputs();
 
   if (storedData && storedData.length > 0) {
     console.log(`✅ Found stored CSV data for ${idPrefix}, loading...`);
@@ -221,6 +231,7 @@ async function handleCSVUpload(event) {
       await window.syncUIWithLocalStorage?.();
     }
 
+    clearPatientInputs();
     const matchResults = matchCSVToTablePatients(window.csvPatientData);
     displayMatchResults(matchResults);
 
@@ -727,6 +738,7 @@ window.storeCSVData = storeCSVData;
 window.getStoredCSVData = getStoredCSVData;
 window.clearStoredCSVData = clearStoredCSVData;
 window.tryLoadAnyStoredData = tryLoadAnyStoredData;
+window.clearPatientInputs = clearPatientInputs;
 window.checkForStoredCSVData = checkForStoredCSVData;
 window.updateCSVButton = updateCSVButton;
 window.autoDetectIdPrefix = autoDetectIdPrefix;
