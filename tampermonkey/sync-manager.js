@@ -161,7 +161,7 @@
     el.style.background  = s.bg;
     el.style.color       = s.color;
     el.style.opacity     = '1';
-    el.textContent       = `${s.icon} Sync: ${message}`;
+    el.textContent       = `${s.icon} Stare: ${message}`;
 
     if (state === 'ok') {
       setTimeout(() => { el.style.opacity = '0.4'; }, 4000);
@@ -197,7 +197,7 @@
         onload: (response) => {
           if (response.status === 401) {
             _cachedBasicAuth = null;
-            setSyncStatus('error', 'Credentials rejected');
+            setSyncStatus('error', 'Credențiale respinse');
             console.warn('[Sync] Credentials rejected (401).');
             resolve(null);
             return;
@@ -205,18 +205,18 @@
           try {
             resolve(JSON.parse(response.responseText));
           } catch {
-            setSyncStatus('error', 'Invalid server response');
+            setSyncStatus('error', 'Răspuns invalid de la server');
             console.warn('[Sync] Invalid server response:', response.responseText);
             resolve(null);
           }
         },
         onerror: (err) => {
-          setSyncStatus('error', 'Network error');
+          setSyncStatus('error', 'Eroare de rețea');
           console.error('[Sync] Network error:', err);
           resolve(null);
         },
         ontimeout: () => {
-          setSyncStatus('error', 'Timeout');
+          setSyncStatus('error', 'Timeout conexiune');
           console.warn('[Sync] Request timed out');
           resolve(null);
         },
@@ -235,12 +235,12 @@
 
   async function loadState(prefix) {
     if (!prefix) return;
-    setSyncStatus('syncing', `Loading ${prefix}...`);
+    setSyncStatus('syncing', `Se încarcă ${prefix}...`);
     console.log(`[Sync] Loading state for series: ${prefix}`);
 
     const result = await apiCall('GET', `state&prefix=${encodeURIComponent(prefix)}`);
     if (!result || !result.success) {
-      setSyncStatus('error', 'Load failed');
+      setSyncStatus('error', 'Încărcare eșuată');
       console.warn('[Sync] Failed to load state from server');
       return;
     }
@@ -253,7 +253,7 @@
     };
 
     const csvInfo = _state.csv_data ? `${_state.csv_data.length} CSV rows` : 'no CSV';
-    setSyncStatus('ok', `Loaded ${prefix}`);
+    setSyncStatus('ok', `Încărcat ${prefix}`);
     console.log(`[Sync] Loaded ${_state.queue.length} patients, ${csvInfo}`);
   }
 
@@ -263,7 +263,7 @@
     // Update cache immediately so reads see the new value right away
     _state = { prefix, queue, csv_data: csvData || null, csv_updated_at: csvUpdatedAt || null };
 
-    setSyncStatus('syncing', `Saving ${prefix}...`);
+    setSyncStatus('syncing', `Se salvează ${prefix}...`);
 
     const result = await apiCall('POST', 'state', {
       prefix,
@@ -273,9 +273,9 @@
     });
 
     if (result?.success) {
-      setSyncStatus('ok', `Saved ${prefix}`);
+      setSyncStatus('ok', `Salvat ${prefix}`);
     } else {
-      setSyncStatus('error', 'Save failed');
+      setSyncStatus('error', 'Salvare eșuată');
       console.warn('[Sync] Save failed');
     }
   }
@@ -301,11 +301,11 @@
   // ----------------------------------------------------------------
 
   async function init() {
-    setSyncStatus('syncing', 'Connecting...');
+    setSyncStatus('syncing', 'Se conectează...');
     await getApiBase();
     await getBasicAuth();
     const name = await getDeviceName();
-    setSyncStatus('idle', 'Ready');
+    setSyncStatus('idle', 'Gata!');
     console.log('[Sync] SyncManager initialized, device:', name);
   }
 
