@@ -81,6 +81,7 @@ async function addToBatch(element, index, batchBtn) {
     dataNasterii: cells[3]?.textContent.trim(),
     patientText: patientText,
     idPrefix: idPrefix,
+    importedStatus: importedStatus,
   };
 
   const patientName = patientData.nume.trim();
