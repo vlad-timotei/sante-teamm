@@ -103,14 +103,14 @@ async function autoUploadFile() {
     if (Date.now() > expiresAt) {
       console.warn("⚠️ Upload data expired (>5 minutes old), cleaning up");
       await StorageAdapter.remove("pendingUpload");
-      showTeammNotification("⚠️ Upload data expired. Please export again.", "error");
+      showTeammNotification("⚠️ Datele de upload au expirat. Exportați din nou.", "error");
       return;
     }
 
     console.log(`📤 Starting upload for file: ${filename}`);
     console.log(`📊 Content length: ${content.length} characters`);
 
-    showTeammNotification("⏳ Searching for file input...", "success");
+    showTeammNotification("⏳ Se caută câmpul de upload...", "success");
 
     const fileInput = await waitForFileInput();
     console.log(`📍 File input element:`, fileInput);
@@ -122,7 +122,7 @@ async function autoUploadFile() {
 
     if (fileInput.files.length > 0) {
       console.log(`✅ File successfully set on input:`, fileInput.files[0].name);
-      showTeammNotification(`✅ File uploaded: ${filename}`, "success");
+      showTeammNotification(`✅ Fișier încărcat: ${filename}`, "success");
     } else {
       throw new Error("File was not set on input (verification failed)");
     }
@@ -132,7 +132,7 @@ async function autoUploadFile() {
     console.log("🎉 Upload complete!");
   } catch (error) {
     console.error("❌ Upload failed:", error);
-    showTeammNotification(`❌ Upload failed: ${error.message}`, "error");
+    showTeammNotification(`❌ Upload eșuat: ${error.message}`, "error");
     console.error("Debug info:", {
       url: window.location.href,
       readyState: document.readyState,

@@ -47,9 +47,9 @@ async function clearQueue() {
 
 async function resetExportedStatus() {
   const confirmed = confirm(
-    "🔄 Reset Exported Status?\n\n" +
-      "This will mark ALL patients as NOT exported, allowing you to export them again.\n\n" +
-      "This is a DEV/DEBUG feature. Are you sure?"
+    "🔄 Resetare status export?\n\n" +
+      "Aceasta va marca TOȚI pacienții ca NEEXPORTAȚI, permițându-vă să-i exportați din nou.\n\n" +
+      "Aceasta este o funcție DEV/DEBUG. Sunteți sigur?"
   );
 
   if (!confirmed) return;
@@ -71,14 +71,14 @@ async function resetExportedStatus() {
     await window.syncUIWithLocalStorage();
 
     window.showSuccessToast(
-      "✅ Reset Complete",
-      `Reset exported status for ${resetCount} patients. They can now be exported again.`
+      "✅ Resetare finalizată",
+      `S-a resetat statusul de export pentru ${resetCount} pacienți. Aceștia pot fi exportați din nou.`
     );
 
     console.log(`🔄 Reset exported status for ${resetCount} patients`);
   } catch (error) {
     console.error("Failed to reset exported status:", error);
-    alert("Error resetting exported status. Check console for details.");
+    alert("Eroare la resetarea statusului de export. Verificați consola pentru detalii.");
   }
 }
 

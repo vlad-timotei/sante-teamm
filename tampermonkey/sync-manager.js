@@ -54,11 +54,11 @@
     let url = await GM.getValue('sante-api-url', '');
     if (!url) {
       url = prompt(
-        'Sante Sync - API URL:\n' +
-        '(Ask your administrator for this URL - it is not public)'
+        'Sante Sync - URL API:\n' +
+        '(Cereți administratorului acest URL - nu este public)'
       );
       if (!url || !url.trim()) {
-        setSyncStatus('error', 'No API URL - sync disabled');
+        setSyncStatus('error', 'Fără URL API - sincronizare dezactivată');
         return null;
       }
       url = url.trim().replace(/\/$/, '');
@@ -75,24 +75,24 @@
     let password = await GM.getValue('sante-password', '');
 
     if (!username || !password) {
-      username = prompt('Sante Sync - Username:');
+      username = prompt('Sante Sync - Utilizator:');
       if (!username) {
-        setSyncStatus('error', 'No credentials - sync disabled');
+        setSyncStatus('error', 'Fără credențiale - sincronizare dezactivată');
         return null;
       }
 
-      password = prompt(`Sante Sync - Password for "${username}":`);
+      password = prompt(`Sante Sync - Parola pentru "${username}":`);
       if (!password) {
-        setSyncStatus('error', 'No credentials - sync disabled');
+        setSyncStatus('error', 'Fără credențiale - sincronizare dezactivată');
         return null;
       }
 
       const testAuth = btoa(`${username.trim()}:${password}`);
-      setSyncStatus('syncing', 'Verifying credentials...');
+      setSyncStatus('syncing', 'Se verifică credențialele...');
       const ok = await testCredentials(testAuth);
       if (!ok) {
-        setSyncStatus('error', 'Invalid username or password');
-        alert('Sante Sync: Invalid username or password. Try again.');
+        setSyncStatus('error', 'Utilizator sau parolă invalide');
+        alert('Sante Sync: Utilizator sau parolă invalide. Încercați din nou.');
         return null;
       }
 
@@ -126,7 +126,7 @@
     await GM.deleteValue('sante-api-url');
     _cachedBasicAuth = null;
     _apiBase         = null;
-    setSyncStatus('idle', 'Credentials cleared');
+    setSyncStatus('idle', 'Credențiale șterse');
   }
 
   // ----------------------------------------------------------------

@@ -186,7 +186,7 @@ async function syncUIWithLocalStorage() {
               font-size: 10px;
               margin-top: 5px;
             `;
-            indicator.textContent = "🚫 Excluded from export";
+            indicator.textContent = "🚫 Exclus din export";
             testResultCell.appendChild(indicator);
           }
         }
@@ -213,8 +213,8 @@ async function syncUIWithLocalStorage() {
     console.log(`💾 Saved ${statusChangesDetected} status change(s) to storage`);
 
     window.showSuccessToast(
-      "🔔 Status Changes Detected",
-      `${statusChangesDetected} patient(s) now have results ready. Click "Refetch" to update their data.`
+      "🔔 Schimbări de status detectate",
+      `${statusChangesDetected} pacient(i) au acum rezultate disponibile. Apăsați "Reîncarcă" pentru a actualiza datele.`
     );
   }
 

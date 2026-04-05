@@ -60,7 +60,7 @@ async function exportData() {
   );
   if (missingIds.length > 0) {
     alert(
-      `Cannot export: ${missingIds.length} patient(s) are missing ID suffixes. Please enter ID suffixes for all selected patients.`
+      `Nu se poate exporta: ${missingIds.length} pacient(i) nu au sufixe de ID. Introduceți sufixe de ID pentru toți pacienții selectați.`
     );
     return;
   }
@@ -110,8 +110,8 @@ async function exportData() {
       );
       validationIssues.forEach((issue) => {
         window.showWarningToast(
-          `⚠️ Could not export data for: ${issue.patient}`,
-          `Extracted ${issue.extractedTests} tests but 0 rows exported (tests not mapped to known keys)`,
+          `⚠️ Nu s-au putut exporta datele pentru: ${issue.patient}`,
+          `S-au extras ${issue.extractedTests} analize dar 0 rânduri exportate (analizele nu corespund cheilor cunoscute)`,
           true
         );
       });
@@ -190,16 +190,16 @@ async function exportData() {
 
   const exportMessage =
     patientsWithExportableData.length === patientsToExport.length
-      ? `Exported ${patientsWithExportableData.length} patients with exportable data.`
-      : `Exported ${
+      ? `S-au exportat ${patientsWithExportableData.length} pacienți cu date exportabile.`
+      : `S-au exportat ${
           patientsWithExportableData.length
-        } patients with exportable data (${
+        } pacienți cu date exportabile (${
           patientsToExport.length - patientsWithExportableData.length
-        } had no exportable tests).`;
+        } nu au avut analize exportabile).`;
 
   window.showSuccessToast(
-    "✅ Export Complete",
-    exportMessage + " Data preserved in localStorage."
+    "✅ Export finalizat",
+    exportMessage
   );
 
   await new Promise(resolve => setTimeout(resolve, 500));

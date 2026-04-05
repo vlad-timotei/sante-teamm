@@ -3,7 +3,7 @@
 
 function hideCharismaFooter() {
   const footerDivs = document.querySelectorAll(
-    'div[style*="position: fixed"][style*="bottom: 0"]'
+    'div[style*="position: fixed"][style*="bottom: 0"]',
   );
   footerDivs.forEach((div) => {
     const link = div.querySelector('a[href*="charisma"]');
@@ -16,7 +16,7 @@ function hideCharismaFooter() {
 
 function makeFiltersCollapsible() {
   const formGroups = document.querySelectorAll(
-    ".form-horizontal .row.form-group"
+    ".form-horizontal .row.form-group",
   );
 
   if (formGroups.length === 0) {
@@ -36,14 +36,14 @@ function makeFiltersCollapsible() {
   }
 
   const complexResultsLabel = document.getElementById(
-    "ctl00_contentMain_lblComplexResults"
+    "ctl00_contentMain_lblComplexResults",
   );
   if (complexResultsLabel) {
     complexResultsLabel.style.display = "none";
   }
 
   const logoContainer = document.querySelector(
-    'div[style*="padding-bottom: 5%"]'
+    'div[style*="padding-bottom: 5%"]',
   );
   if (logoContainer) {
     const logoImage = logoContainer.querySelector('img[src*="Sigla.png"]');
@@ -92,7 +92,7 @@ function makeFiltersCollapsible() {
   };
 
   const quickFilterButtons = document.querySelector(
-    '.form-horizontal div > input[id*="btnFilter"]'
+    '.form-horizontal div > input[id*="btnFilter"]',
   );
   if (quickFilterButtons && quickFilterButtons.parentElement) {
     quickFilterButtons.parentElement.appendChild(toggleButton);
@@ -107,7 +107,7 @@ function makeFiltersCollapsible() {
     const parent = formHorizontal || firstFormGroup.parentNode.parentNode;
     if (parent) {
       const quickFilterRow = document.querySelector(
-        '.form-horizontal .row:has(input[id*="btnFilter"])'
+        '.form-horizontal .row:has(input[id*="btnFilter"])',
       );
       if (quickFilterRow && quickFilterRow.nextSibling) {
         parent.insertBefore(collapseWrapper, quickFilterRow.nextSibling);
@@ -118,7 +118,7 @@ function makeFiltersCollapsible() {
   }
 
   const hasFilledInputs = Array.from(
-    collapseWrapper.querySelectorAll('input[type="text"], select')
+    collapseWrapper.querySelectorAll('input[type="text"], select'),
   ).some((input) => {
     if (input.tagName === "SELECT") {
       return input.value && input.value !== "-1" && input.value !== "";
@@ -129,7 +129,7 @@ function makeFiltersCollapsible() {
   if (hasFilledInputs) {
     isExpanded = true;
     collapseWrapper.style.maxHeight = collapseWrapper.scrollHeight + "px";
-    toggleButton.value = "▲ Hide Filters";
+    toggleButton.value = "▲ Filtre";
     console.log("✅ Filters expanded by default (inputs have values)");
   }
 
@@ -159,12 +159,12 @@ function addTestResultsColumn() {
     if (thElements.length > 0) {
       headerRow = row;
       console.log(
-        `📋 Row ${index} is header row (has ${thElements.length} th elements)`
+        `📋 Row ${index} is header row (has ${thElements.length} th elements)`,
       );
     } else if (tdElements.length > 0) {
       dataRows.push(row);
       console.log(
-        `📋 Row ${index} is data row (has ${tdElements.length} td elements)`
+        `📋 Row ${index} is data row (has ${tdElements.length} td elements)`,
       );
     }
   });
@@ -297,7 +297,7 @@ function addTestResultsColumn() {
     row.appendChild(testResultsCell);
 
     console.log(
-      `✅ Added batch processing and test results cells ${index} for link ${downloadLink.id}`
+      `✅ Added batch processing and test results cells ${index} for link ${downloadLink.id}`,
     );
   });
 
@@ -306,7 +306,7 @@ function addTestResultsColumn() {
 
 function hideUnwantedColumns(table) {
   console.log(
-    "🔧 Hiding unwanted columns (Nr Doc, Cod Bare, and Unitate recoltare)"
+    "🔧 Hiding unwanted columns (Nr Doc, Cod Bare, and Unitate recoltare)",
   );
 
   const rows = table.querySelectorAll("tr");
@@ -354,7 +354,7 @@ function hideUnwantedColumns(table) {
 
 function findDownloadElements() {
   const downloadLinks = document.querySelectorAll(
-    '#ctl00_contentMain_dgGrid a[id*="lnkView"]'
+    '#ctl00_contentMain_dgGrid a[id*="lnkView"]',
   );
   return Array.from(downloadLinks);
 }
@@ -398,7 +398,7 @@ function createSingleProcessButton() {
         text-align: center;
         transition: all 0.2s;
       " onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">
-        📁 Choose CSV File
+        📁 Alege fișier CSV
       </label>
       <input type="file" id="csv-upload" accept=".csv" style="display: none;">
       <button type="button" id="sante-analyze-page" style="
@@ -435,7 +435,7 @@ function createSingleProcessButton() {
       </button>
     </div>
     <div id="analysis-progress" style="display: none; margin-top: 8px; text-align: center; font-size: 12px; color: #007cba; font-weight: bold;">
-      🔄 Analyzing page... (<span id="analysis-completed">0</span>/<span id="analysis-total">0</span> complete)
+      🔄 Se analizează pagina... (<span id="analysis-completed">0</span>/<span id="analysis-total">0</span> finalizate)
     </div>
     <div id="match-results" style="display: none;"></div>
   `;
@@ -462,7 +462,9 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
   const testResults = extractedData.structuredData?.testResults || {};
   const exportedTests = extractedData.exportedTests || {};
   const totalTests = Object.keys(testResults).length;
-  const exportedCount = Object.keys(testResults).filter((k) => exportedTests[k]).length;
+  const exportedCount = Object.keys(testResults).filter(
+    (k) => exportedTests[k],
+  ).length;
 
   let statusChangeBadge = "";
   if (extractedData.statusChangedSinceImport) {
@@ -478,7 +480,7 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
         margin-bottom: 6px;
         border: 1px solid #ffeeba;
       ">
-        🔔 Status changed! Results ready to fetch
+        🔔 Statusul s-a schimbat! Rezultate noi disponibile!
       </div>
     `;
   }
@@ -486,10 +488,10 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
   let refetchButton = "";
   if (patientKey) {
     const buttonLabel = extractedData.statusChangedSinceImport
-      ? "🔄 Refetch Results"
+      ? "🔄 Reîncarcă rezultate"
       : extractedData.needsReexport
-      ? "🔄 Refetch (new tests available)"
-      : "🔄 Refetch";
+        ? "🔄 Reîncarcă (analize noi disponibile)"
+        : "🔄 Reîncarcă";
     const statusChanged = extractedData.statusChangedSinceImport === true;
     refetchButton = `
       <button
@@ -506,7 +508,7 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
           margin-bottom: 6px;
           display: block;
         "
-        title="Re-download PDF and update test results"
+        title="Redescarcă PDF-ul și actualizează rezultatele"
       >
         ${buttonLabel}
       </button>
@@ -538,8 +540,8 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
           font-weight: bold;
           margin-bottom: 4px;
           cursor: help;
-        " title="All ${totalTests} tests exported on: ${exportDate}">
-          ✓ Exported
+        " title="Toate cele ${totalTests} analize exportate la: ${exportDate}">
+          ✓ Exportat
         </div>
       `;
     } else {
@@ -554,8 +556,8 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
           font-weight: bold;
           margin-bottom: 4px;
           cursor: help;
-        " title="${exportedCount}/${totalTests} tests exported. ${totalTests - exportedCount} test(s) pending export.">
-          ⚡ ${exportedCount}/${totalTests} Exported
+        " title="${exportedCount}/${totalTests} analize exportate. ${totalTests - exportedCount} analiză(e) în așteptare.">
+          ⚡ ${exportedCount}/${totalTests} Exportate
         </div>
       `;
     }
@@ -575,7 +577,7 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
         margin-bottom: 4px;
         margin-left: 4px;
       ">
-        ⚡ New tests
+        ⚡ Analize noi
       </div>
     `;
   }
@@ -585,7 +587,7 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
       statusChangeBadge +
       refetchButton +
       exportedBadge +
-      `<span style="color: #dc3545;">❌ Error: ${extractedData.error}</span>`;
+      `<span style="color: #dc3545;">❌ Eroare: ${extractedData.error}</span>`;
     return;
   }
 
@@ -601,14 +603,16 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
     testResultCell.innerHTML =
       statusChangeBadge +
       refetchButton +
-      `<span style="color: #ffc107;">⚠️ No tests found</span>`;
+      `<span style="color: #ffc107;">⚠️ Nu s-au găsit analize</span>`;
     return;
   }
 
   let testsHtml = `<div style="color: #28a745; font-weight: bold;">${testCount} analiză(e):</div>`;
 
   const ORDER = window.TEST_DEFINITIONS.map((t) => t.key);
-  const DISPLAY = Object.fromEntries(window.TEST_DEFINITIONS.map((t) => [t.key, t.name]));
+  const DISPLAY = Object.fromEntries(
+    window.TEST_DEFINITIONS.map((t) => [t.key, t.name]),
+  );
 
   knownItems.sort((a, b) => {
     const ai = ORDER.indexOf(a.key);
@@ -619,42 +623,50 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
   knownItems.forEach(({ key, value, isExported }) => {
     const label = DISPLAY[key] || key;
     const exportIcon = isExported ? "✓" : "○";
-    const style = isExported ? "color: #6c757d;" : "color: #000; font-weight: bold;";
-    const tooltip = isExported ? "Already exported" : "Not yet exported";
+    const style = isExported
+      ? "color: #6c757d;"
+      : "color: #000; font-weight: bold;";
+    const tooltip = isExported ? "Deja exportat" : "Neexportat încă";
     testsHtml += `<div style="margin: 2px 0; ${style}" title="${tooltip}">
       <span style="font-size: 10px;">${exportIcon}</span> ${label}: <strong>${value}</strong>
     </div>`;
   });
 
   testResultCell.innerHTML =
-    statusChangeBadge + refetchButton + exportedBadge + needsReexportBadge + testsHtml;
+    statusChangeBadge +
+    refetchButton +
+    exportedBadge +
+    needsReexportBadge +
+    testsHtml;
   testResultCell.style.color = "#000";
-  testResultCell.title = `Full test results for this patient (${testCount} tests).`;
+  testResultCell.title = `Rezultatele complete pentru acest pacient (${testCount} analize).`;
 }
 
 function updateTestResultsColumn(elementIndex, extractedData) {
   const testResultCell = document.getElementById(
-    `test-results-${elementIndex}`
+    `test-results-${elementIndex}`,
   );
 
   if (!testResultCell) {
     console.warn(
       `Test result cell not found for index ${elementIndex}. Available cells:`,
       Array.from(document.querySelectorAll('[id^="test-results-"]')).map(
-        (cell) => cell.id
-      )
+        (cell) => cell.id,
+      ),
     );
     return;
   }
 
   console.log(
     `%c📊 UPDATING TEST RESULTS for index ${elementIndex}`,
-    "color: blue; font-weight: bold"
+    "color: blue; font-weight: bold",
   );
 
   const idPrefix = document.getElementById("id-prefix")?.value.trim();
   const patientName = extractedData.patientInfo?.nume;
-  const patientKey = patientName ? window.getPatientKey(idPrefix, patientName) : null;
+  const patientKey = patientName
+    ? window.getPatientKey(idPrefix, patientName)
+    : null;
 
   displayTestResults(testResultCell, extractedData, patientKey);
 }

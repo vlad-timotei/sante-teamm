@@ -121,10 +121,10 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
       font-size: 10px;
       cursor: pointer;
       font-weight: bold;
-    " title="Clear stored CSV data">✕</span>`;
+    " title="Șterge datele CSV stocate">✕</span>`;
     csvLabel.style.background = "#17a2b8";
     csvLabel.style.borderColor = "#17a2b8";
-    csvLabel.title = `Using stored CSV data for ID prefix ${idPrefix} with ${patientCount} patients. Click to replace with new CSV.`;
+    csvLabel.title = `Se folosesc datele CSV stocate pentru prefixul ${idPrefix} cu ${patientCount} pacienți. Click pentru a înlocui cu un CSV nou.`;
 
     setTimeout(() => {
       const clearButton = document.getElementById("clear-csv-data");
@@ -148,10 +148,10 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
       }
     }, 10);
   } else {
-    csvLabel.innerHTML = "📁 Choose CSV File";
+    csvLabel.innerHTML = "📁 Alege fișier CSV";
     csvLabel.style.background = "#28a745";
     csvLabel.style.borderColor = "#28a745";
-    csvLabel.title = "Click to upload a new CSV file";
+    csvLabel.title = "Click pentru a încărca un fișier CSV nou";
   }
 }
 
@@ -202,12 +202,12 @@ async function handleCSVUpload(event) {
   const file = fileInput.files[0];
 
   if (!file) {
-    alert("Please select a CSV file first.");
+    alert("Selectați mai întâi un fișier CSV.");
     return;
   }
 
   if (!file.name.toLowerCase().endsWith(".csv")) {
-    alert("Please select a CSV file (.csv extension required).");
+    alert("Selectați un fișier CSV (extensie .csv necesară).");
     return;
   }
 
@@ -216,7 +216,7 @@ async function handleCSVUpload(event) {
     window.csvPatientData = parseCSV(csvContent);
 
     if (window.csvPatientData.length === 0) {
-      alert("No patient data found in CSV file.");
+      alert("Nu s-au găsit date de pacienți în fișierul CSV.");
       return;
     }
 
@@ -229,7 +229,7 @@ async function handleCSVUpload(event) {
         // If load failed, _state.prefix won't match — abort to avoid data loss
         if (window.SyncManager?.getCachedState()?.prefix !== detectedPrefix) {
           alert(
-            `Failed to load series "${detectedPrefix}" from server. Check your connection and try again.`,
+            `Nu s-a putut încărca seria "${detectedPrefix}" de pe server. Verificați conexiunea și încercați din nou.`,
           );
           return;
         }
@@ -247,7 +247,7 @@ async function handleCSVUpload(event) {
     setTimeout(() => window.updateDownloadCount(), 100);
   } catch (error) {
     console.error("CSV upload error:", error);
-    alert("Error reading CSV file: " + error.message);
+    alert("Eroare la citirea fișierului CSV: " + error.message);
   }
 }
 

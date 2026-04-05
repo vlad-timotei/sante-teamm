@@ -29,7 +29,7 @@ async function addToBatch(element, index, batchBtn) {
   const patientText = patientTextInput ? patientTextInput.value.trim() : "";
 
   if (!patientText) {
-    alert("Please enter an ID suffix for this patient before adding to batch.");
+    alert("Introduceți un sufix de ID pentru acest pacient înainte de a-l adăuga.");
     return;
   }
 
@@ -56,7 +56,7 @@ async function addToBatch(element, index, batchBtn) {
       }
     } else {
       alert(
-        `Cannot process patient: Status is "${statusTitle}". Only patients with "Efectuat cu rezultate", "In lucru", or "Rezultate partiale" status can be processed.`
+        `Nu se poate procesa pacientul: Statusul este "${statusTitle}". Doar pacienții cu statusul "Efectuat cu rezultate", "In lucru" sau "Rezultate partiale" pot fi procesați.`
       );
       console.log(
         `❌ BLOCKED: Patient status "${statusTitle}" - not allowed`
@@ -71,7 +71,7 @@ async function addToBatch(element, index, batchBtn) {
 
   const idPrefix = document.getElementById("id-prefix")?.value.trim();
   if (!idPrefix) {
-    alert("Please enter an ID prefix (e.g., 25S19) before processing.");
+    alert("Introduceți un prefix de ID (ex: 25S19) înainte de procesare.");
     return;
   }
 
@@ -231,7 +231,7 @@ async function addToBatch(element, index, batchBtn) {
 
     batchBtn.textContent = "❌";
     batchBtn.style.background = "#dc3545";
-    batchBtn.title = `Error: ${error.message}. Click to retry.`;
+    batchBtn.title = `Eroare: ${error.message}. Click pentru a reîncerca.`;
 
     batchBtn.setAttribute("data-batched", "false");
 
@@ -278,7 +278,7 @@ async function removeFromBatch(element, index, batchBtn) {
 
   const idPrefix = document.getElementById("id-prefix")?.value.trim();
   if (!idPrefix) {
-    alert("Please enter an ID prefix before removing from batch.");
+    alert("Introduceți un prefix de ID înainte de a elimina din lot.");
     return;
   }
 
@@ -361,7 +361,7 @@ async function removeFromBatch(element, index, batchBtn) {
         font-size: 10px;
         margin-top: 5px;
       `;
-      indicator.textContent = "🚫 Excluded from export";
+      indicator.textContent = "🚫 Exclus din export";
       testResultCell.appendChild(indicator);
     }
   }
@@ -380,7 +380,7 @@ async function processBatch() {
 
     const statusText = document.getElementById("status-text");
     if (statusText) {
-      statusText.textContent = `Processing ${i + 1}/${
+      statusText.textContent = `Se procesează ${i + 1}/${
         window.batchQueue.length
       }: ${patientName}`;
     }
@@ -487,7 +487,7 @@ function clearAllData() {
 
   const testResultCells = document.querySelectorAll('[id^="test-results-"]');
   testResultCells.forEach((cell) => {
-    cell.textContent = "Not processed";
+    cell.textContent = "Neprocesat";
     cell.style.color = "#666";
     cell.removeAttribute("title");
   });
@@ -505,7 +505,7 @@ async function analyzeCurrentPage() {
 
   const idPrefix = document.getElementById("id-prefix")?.value.trim();
   if (!idPrefix) {
-    alert("Please enter an ID prefix (e.g., 25S19) before analyzing.");
+    alert("Introduceți un prefix de ID (ex: 25S19) înainte de analiză.");
     return;
   }
 
@@ -603,7 +603,7 @@ async function analyzeCurrentPage() {
 
   if (analyzeButton) {
     analyzeButton.disabled = true;
-    analyzeButton.innerHTML = `🔄 Analyzing... (0/${patientsWithIDs.length})`;
+    analyzeButton.innerHTML = `🔄 Se analizează... (0/${patientsWithIDs.length})`;
     analyzeButton.style.background = "#007cba";
     analyzeButton.style.cursor = "not-allowed";
   }
@@ -647,7 +647,7 @@ async function refetchPatientData(patientKey, rowElement) {
   console.log(`🔄 Starting refetch for patient key: ${patientKey}`);
 
   if (!patientKey) {
-    window.showWarningToast("❌ Refetch Failed", "Patient key not found.");
+    window.showWarningToast("❌ Reîncărcare eșuată", "Cheia pacientului nu a fost găsită.");
     return;
   }
 
@@ -657,13 +657,13 @@ async function refetchPatientData(patientKey, rowElement) {
   );
 
   if (!existingPatient) {
-    window.showWarningToast("❌ Refetch Failed", "Patient not found in storage.");
+    window.showWarningToast("❌ Reîncărcare eșuată", "Pacientul nu a fost găsit în stocare.");
     return;
   }
 
   const downloadLink = rowElement?.querySelector('a[href*="__doPostBack"]');
   if (!downloadLink) {
-    window.showWarningToast("❌ Refetch Failed", "Download link not found.");
+    window.showWarningToast("❌ Reîncărcare eșuată", "Link-ul de descărcare nu a fost găsit.");
     return;
   }
 
@@ -673,7 +673,7 @@ async function refetchPatientData(patientKey, rowElement) {
 
   const testResultCell = rowElement?.querySelector('[id^="test-results-"]');
   if (testResultCell) {
-    testResultCell.innerHTML = '<span style="color: #ffc107;">⏳ Refetching...</span>';
+    testResultCell.innerHTML = '<span style="color: #ffc107;">⏳ Se reîncarcă...</span>';
   }
 
   try {
@@ -732,19 +732,19 @@ async function refetchPatientData(patientKey, rowElement) {
       await window.updateExportCount();
 
       const message = newTestsFound > 0
-        ? `Found ${newTestsFound} new test(s). Total: ${Object.keys(mergedTestResults).length} tests.`
-        : `No new tests found. Total: ${Object.keys(mergedTestResults).length} tests.`;
+        ? `S-au găsit ${newTestsFound} analize noi. Total: ${Object.keys(mergedTestResults).length} analize.`
+        : `Nu s-au găsit analize noi. Total: ${Object.keys(mergedTestResults).length} analize.`;
 
-      window.showSuccessToast("🔄 Refetch Complete", message);
+      window.showSuccessToast("🔄 Reîncărcare finalizată", message);
       console.log(`✅ Refetch complete for ${existingPatient.patientInfo?.nume}: ${message}`);
     } else {
-      window.showWarningToast("⚠️ Refetch Warning", "Could not extract test data from PDF.");
+      window.showWarningToast("⚠️ Avertisment reîncărcare", "Nu s-au putut extrage datele din PDF.");
 
       window.displayTestResults(testResultCell, existingPatient, patientKey);
     }
   } catch (error) {
     console.error("Refetch failed:", error);
-    window.showWarningToast("❌ Refetch Failed", error.message);
+    window.showWarningToast("❌ Reîncărcare eșuată", error.message);
 
     window.displayTestResults(testResultCell, existingPatient, patientKey);
   }
@@ -1092,7 +1092,7 @@ function updateAnalysisProgress() {
     }
 
     if (analyzeButton) {
-      analyzeButton.innerHTML = `🔄 Analyzing... (${window.currentPageAnalysis.completed}/${window.currentPageAnalysis.total})`;
+      analyzeButton.innerHTML = `🔄 Se analizează... (${window.currentPageAnalysis.completed}/${window.currentPageAnalysis.total})`;
     }
   } else {
     if (progressDiv) {
@@ -1130,12 +1130,12 @@ async function finishBatchAnalysis() {
 
   const message =
     newPatients.length === window.currentPageAnalysis.patients.length
-      ? `Added ${newPatients.length} patients`
-      : `Added ${newPatients.length} patients (${
+      ? `S-au adăugat ${newPatients.length} pacienți`
+      : `S-au adăugat ${newPatients.length} pacienți (${
           window.currentPageAnalysis.patients.length - newPatients.length
-        } duplicates skipped)`;
+        } duplicate ignorate)`;
 
-  window.showSuccessToast("✅ Analysis Complete", message);
+  window.showSuccessToast("✅ Analiză finalizată", message);
 
   window.currentPageAnalysis = {
     isAnalyzing: false,
