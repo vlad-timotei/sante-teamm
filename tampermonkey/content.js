@@ -7,6 +7,15 @@ async function initializeBatchExtension() {
 
   await window.SyncManager.init();
 
+  document.title = "Analize Sante";
+  const existingFavicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
+  if (existingFavicon) existingFavicon.remove();
+  const favicon = document.createElement("link");
+  favicon.rel = "icon";
+  favicon.type = "image/png";
+  favicon.href = "https://i.ibb.co/8DkVV28V/sante-teamm-favicon.png";
+  document.head.appendChild(favicon);
+
   window.hideCharismaFooter();
   window.makeFiltersCollapsible();
   window.addTestResultsColumn();
