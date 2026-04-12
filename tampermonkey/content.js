@@ -9,6 +9,12 @@ function formatSessionLabel(prefix) {
 }
 window.formatSessionLabel = formatSessionLabel;
 
+// Natural sort: "26S1" < "26S2" < "26S10" < "26S25"
+function naturalSortSeries(a, b) {
+  return a.prefix.localeCompare(b.prefix, undefined, { numeric: true, sensitivity: 'base' });
+}
+window.naturalSortSeries = naturalSortSeries;
+
 async function initializeBatchExtension() {
   window.pdfProcessor = new window.PDFProcessor();
   await window.pdfProcessor.loadPDFJS();
@@ -50,7 +56,7 @@ async function initializeBatchExtension() {
     const allSeries = await window.SyncManager.fetchAllSeries();
     const currentPrefix = await window.SyncManager.fetchCurrentSeries();
 
-    allSeries.forEach((s) => {
+    allSeries.sort(naturalSortSeries).forEach((s) => {
       const opt = document.createElement("option");
       opt.value = s.prefix;
       opt.textContent = window.formatSessionLabel(s.prefix);
@@ -95,7 +101,7 @@ async function initializeBatchExtension() {
         const currentVal = select.value;
         // Remove all options except the first placeholder
         while (select.options.length > 1) select.remove(1);
-        freshSeries.forEach((s) => {
+        freshSeries.sort(naturalSortSeries).forEach((s) => {
           const opt = document.createElement("option");
           opt.value = s.prefix;
           opt.textContent = window.formatSessionLabel(s.prefix);
