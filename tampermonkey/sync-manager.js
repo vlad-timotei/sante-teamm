@@ -301,9 +301,26 @@
   // ----------------------------------------------------------------
 
   async function syncSessions() {
+    // Check if we already have sessions for the current year in cache
+    const yy = String(new Date().getFullYear()).slice(-2);
+    const cached = await GM.getValue('sante-sessions-cache', '');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        const hasCurrentYear = parsed.some((s) => s.prefix.startsWith(yy));
+        if (hasCurrentYear) {
+          console.log('[Sync] Sessions cached, skipping API sync');
+          return { success: true, created: 0, skipped: parsed.length, cached: true };
+        }
+      } catch (e) { /* invalid cache, re-fetch */ }
+    }
+
     setSyncStatus('syncing', 'Se sincronizează sejururile...');
     const result = await apiCall('POST', 'sync_sessions');
     if (result?.success) {
+      // Update cache
+      const fresh = await fetchAllSeries();
+      await GM.setValue('sante-sessions-cache', JSON.stringify(fresh));
       const msg = result.created > 0
         ? `${result.created} sejururi noi, ${result.skipped} existente`
         : 'Sejururi încărcate!';

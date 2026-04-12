@@ -11,9 +11,28 @@ function clearPatientInputs() {
   document.querySelectorAll(".csv-match").forEach((el) => el.remove());
 }
 
-// Always fetch fresh patient IDs from Teamm API and apply matching
+// Fetch patient IDs from Teamm API, cached per day per session
 async function fetchAndApplyPatientIds(prefix) {
   if (!prefix) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const cacheKey = 'sante-patients-cache';
+  const cached = await GM.getValue(cacheKey, '');
+
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (parsed.prefix === prefix && parsed.date === today && parsed.patients?.length > 0) {
+        console.log(`[Patients] Using cached data for ${prefix} (${parsed.patients.length} patients)`);
+        window.csvPatientData = parsed.patients;
+        clearPatientInputs();
+        const matchResults = matchCSVToTablePatients(window.csvPatientData);
+        displayMatchResults(matchResults);
+        setTimeout(() => window.updateDownloadCount?.(), 100);
+        return;
+      }
+    } catch (e) { /* invalid cache, re-fetch */ }
+  }
 
   console.log(`🔄 Fetching patient IDs from API for ${prefix}...`);
   const result = await window.SyncManager.fetchGuests(prefix);
@@ -24,6 +43,14 @@ async function fetchAndApplyPatientIds(prefix) {
   }
 
   window.csvPatientData = result.patients;
+
+  // Only cache if all patients have IDs
+  const allHaveIds = result.patients.every((p) => p.fullId);
+  if (allHaveIds) {
+    await GM.setValue(cacheKey, JSON.stringify({ prefix, date: today, patients: result.patients }));
+  } else {
+    await GM.deleteValue(cacheKey);
+  }
 
   clearPatientInputs();
   const matchResults = matchCSVToTablePatients(window.csvPatientData);

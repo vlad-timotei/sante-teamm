@@ -40,6 +40,21 @@ function hideCharismaFooter() {
         spacer.style.flex = "1";
         bottomBar.appendChild(spacer);
 
+        const refreshLink = document.createElement("a");
+        refreshLink.href = "#";
+        refreshLink.textContent = "🔄 Reîncarcă pacienți";
+        refreshLink.style.cssText = `
+          color: #17a2b8; text-decoration: none; font-size: 12px;
+          font-weight: bold; white-space: nowrap; cursor: pointer;
+        `;
+        refreshLink.onclick = async (e) => {
+          e.preventDefault();
+          await GM.deleteValue('sante-patients-cache');
+          const currentPrefix = document.getElementById("id-prefix")?.value;
+          if (currentPrefix) await window.fetchAndApplyPatientIds(currentPrefix);
+        };
+        bottomBar.appendChild(refreshLink);
+
         const dashLink = document.createElement("a");
         dashLink.href = "#";
         dashLink.textContent = "⚙️ Administrare Teste";

@@ -52,11 +52,16 @@ async function initializeBatchExtension() {
 
   const idPrefixSelect = document.getElementById("id-prefix");
 
-  // Auto-sync sessions from Teamm API, then populate dropdown
+  // Load sessions (cached or from API)
   if (idPrefixSelect) {
     idPrefixSelect.disabled = true;
-    await window.SyncManager.syncSessions();
-    const allSeries = await window.SyncManager.fetchAllSeries();
+    const syncResult = await window.SyncManager.syncSessions();
+    let allSeries;
+    if (syncResult?.cached) {
+      allSeries = JSON.parse(await GM.getValue('sante-sessions-cache', '[]'));
+    } else {
+      allSeries = await window.SyncManager.fetchAllSeries();
+    }
     const currentPrefix = await window.SyncManager.fetchCurrentSeries();
 
     allSeries.sort(naturalSortSeries).forEach((s) => {
