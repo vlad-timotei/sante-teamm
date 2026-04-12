@@ -375,16 +375,32 @@ function createSingleProcessButton() {
 
   buttonContainer.innerHTML = `
     <div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
-      <input type="hidden" id="id-prefix">
-      <span id="id-prefix-display" style="
+      <select id="id-prefix" style="
         background: #17a2b8;
         color: white;
         padding: 4px 10px;
         border-radius: 4px;
         font-size: 12px;
         font-weight: bold;
-        display: none;
-      "></span>
+        border: 2px solid #17a2b8;
+        cursor: pointer;
+        min-width: 120px;
+      ">
+        <option value="">-- Sesiune --</option>
+      </select>
+      <button type="button" id="sante-add-session" style="
+        background: #17a2b8;
+        color: white;
+        border: 2px solid #17a2b8;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: bold;
+        transition: all 0.2s;
+      " onmouseover="this.style.background='#138496'" onmouseout="this.style.background='#17a2b8'">
+        + Sesiune nouă
+      </button>
       <label for="csv-upload" style="
         background: #28a745;
         color: white;

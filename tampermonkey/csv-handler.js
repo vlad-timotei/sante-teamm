@@ -96,17 +96,6 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
   const csvLabel = document.querySelector('label[for="csv-upload"]');
   if (!csvLabel) return;
 
-  // Update prefix display
-  const prefixDisplay = document.getElementById("id-prefix-display");
-  if (prefixDisplay) {
-    if (isStored && idPrefix) {
-      prefixDisplay.textContent = `Prefix: ${idPrefix}`;
-      prefixDisplay.style.display = "inline-block";
-    } else {
-      prefixDisplay.style.display = "none";
-    }
-  }
-
   if (isStored) {
     csvLabel.innerHTML = `Sejur ${idPrefix} (${patientCount} pacienți) <span id="clear-csv-data" style="
       margin-left: 8px;
@@ -136,11 +125,6 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
           await clearStoredCSVData(idPrefix);
           window.csvPatientData = [];
           updateCSVButton("", 0, false);
-
-          const idPrefixInput = document.getElementById("id-prefix");
-          if (idPrefixInput) {
-            idPrefixInput.value = "";
-          }
 
           await window.updateExportCount();
           console.log(`🗑️ Cleared stored CSV data and reset interface`);
@@ -172,19 +156,19 @@ function autoDetectIdPrefix(csvPatients) {
   );
 
   if (prefix) {
-    const idPrefixInput = document.getElementById("id-prefix");
-    if (idPrefixInput) {
-      idPrefixInput.value = prefix;
+    const idPrefixSelect = document.getElementById("id-prefix");
+    if (idPrefixSelect) {
+      // Add option if it doesn't exist in the dropdown yet
+      if (!idPrefixSelect.querySelector(`option[value="${prefix}"]`)) {
+        const opt = document.createElement("option");
+        opt.value = prefix;
+        opt.textContent = `${prefix} (${new Date().getFullYear()})`;
+        idPrefixSelect.appendChild(opt);
+      }
+      idPrefixSelect.value = prefix;
       console.log(
         `✅ Auto-detected ID prefix: ${prefix} (${csvPatients.length} patients)`,
       );
-    }
-
-    // Update the visible prefix display
-    const prefixDisplay = document.getElementById("id-prefix-display");
-    if (prefixDisplay) {
-      prefixDisplay.textContent = `Prefix: ${prefix}`;
-      prefixDisplay.style.display = "inline-block";
     }
 
     return prefix;

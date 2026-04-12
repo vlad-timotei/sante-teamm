@@ -171,6 +171,17 @@ switch ($action) {
         }
         break;
 
+    // ================================================================
+    // GET  ?action=series_list    -> returns all series (prefix, updated_at)
+    // ================================================================
+    case 'series_list':
+        if ($method === 'GET') {
+            $stmt = $pdo->query('SELECT prefix, updated_at, is_current FROM series_state ORDER BY updated_at DESC');
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['success' => true, 'series' => $rows]);
+        }
+        break;
+
     default:
         http_response_code(404);
         echo json_encode(['error' => 'Unknown action']);

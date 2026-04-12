@@ -1,4 +1,4 @@
-// Content v2.0.0
+// Content v2.1.0
 // Main initialization — DB-only sync, no localStorage timeouts
 
 async function initializeBatchExtension() {
@@ -35,36 +35,67 @@ async function initializeBatchExtension() {
     }
   });
 
-  const idPrefixInput = document.getElementById("id-prefix");
+  const idPrefixSelect = document.getElementById("id-prefix");
 
-  // Determine active series prefix
-  let prefix = idPrefixInput?.value.trim();
-  if (!prefix) {
-    prefix = await window.SyncManager.fetchCurrentSeries();
-    if (prefix && idPrefixInput) {
-      idPrefixInput.value = prefix;
-      console.log(`[Sync] Auto-loaded current series from server: ${prefix}`);
+  // Populate session dropdown from DB
+  if (idPrefixSelect) {
+    const allSeries = await window.SyncManager.fetchAllSeries();
+    const currentPrefix = await window.SyncManager.fetchCurrentSeries();
+
+    allSeries.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.prefix;
+      const year = s.updated_at ? new Date(s.updated_at).getFullYear() : "";
+      opt.textContent = year ? `${s.prefix} (${year})` : s.prefix;
+      if (s.prefix === currentPrefix) opt.selected = true;
+      idPrefixSelect.appendChild(opt);
+    });
+
+    const prefix = idPrefixSelect.value;
+
+    // Load state from server and set up UI
+    if (prefix) {
+      await window.SyncManager.loadState(prefix);
+      await window.SyncManager.setCurrentSeries(prefix);
+      await window.migratePatientData();
+      await window.syncUIWithLocalStorage();
+      window.checkForStoredCSVData?.();
     }
-  }
 
-  // Load state from server and set up UI
-  if (prefix) {
-    await window.SyncManager.loadState(prefix);
-    await window.SyncManager.setCurrentSeries(prefix);
-    await window.migratePatientData();
-    await window.syncUIWithLocalStorage();
-    window.checkForStoredCSVData?.();
-  }
-
-  // Prefix change: load fresh state from server
-  if (idPrefixInput) {
-    idPrefixInput.addEventListener("change", async () => {
-      const p = idPrefixInput.value.trim();
+    // Session change: load fresh state from server
+    idPrefixSelect.addEventListener("change", async () => {
+      const p = idPrefixSelect.value;
       if (!p) return;
       await window.SyncManager.loadState(p);
       await window.SyncManager.setCurrentSeries(p);
       await window.syncUIWithLocalStorage();
       window.checkForStoredCSVData?.();
+    });
+  }
+
+  // Add new session button
+  const addSessionBtn = document.getElementById("sante-add-session");
+  if (addSessionBtn) {
+    addSessionBtn.addEventListener("click", async () => {
+      const newPrefix = prompt("Introduceți prefixul noii sesiuni (ex: 25S20):");
+      if (!newPrefix || !newPrefix.trim()) return;
+
+      const prefix = newPrefix.trim();
+
+      // Create the series on server by saving empty state
+      await window.SyncManager.saveState(prefix, [], null, null);
+      await window.SyncManager.setCurrentSeries(prefix);
+
+      // Add to dropdown and select it
+      const opt = document.createElement("option");
+      opt.value = prefix;
+      opt.textContent = `${prefix} (${new Date().getFullYear()})`;
+      opt.selected = true;
+      idPrefixSelect.appendChild(opt);
+      idPrefixSelect.value = prefix;
+
+      await window.syncUIWithLocalStorage();
+      window.showSuccessToast("Sesiune nouă", `Sesiunea ${prefix} a fost creată.`);
     });
   }
 }

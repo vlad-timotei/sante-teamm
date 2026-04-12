@@ -1,4 +1,4 @@
-// Sync Manager v2.1.0
+// Sync Manager v2.2.0
 // DB-only: all state lives on the server, in-memory cache per session
 
 (function () {
@@ -296,6 +296,11 @@
     return result?.current?.prefix || null;
   }
 
+  async function fetchAllSeries() {
+    const result = await apiCall('GET', 'series_list');
+    return result?.series || [];
+  }
+
   // ----------------------------------------------------------------
   // Init
   // ----------------------------------------------------------------
@@ -321,6 +326,7 @@
     setCurrentSeries,
     clearCurrentSeries,
     fetchCurrentSeries,
+    fetchAllSeries,
     resetCredentials,
     getDeviceId,
     getDeviceName,
