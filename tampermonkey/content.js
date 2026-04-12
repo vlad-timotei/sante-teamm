@@ -80,7 +80,6 @@ async function initializeBatchExtension() {
     if (prefix) {
       idPrefixSelect.disabled = true;
       await window.SyncManager.loadState(prefix);
-      await window.SyncManager.setCurrentSeries(prefix);
       await window.migratePatientData();
       await window.syncUIWithLocalStorage();
       await window.fetchAndApplyPatientIds(prefix);
