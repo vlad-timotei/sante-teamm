@@ -178,7 +178,7 @@ switch ($action) {
     // ================================================================
     case 'series_list':
         if ($method === 'GET') {
-            $stmt = $pdo->query('SELECT prefix, updated_at, is_current FROM series_state ORDER BY updated_at DESC');
+            $stmt = $pdo->query("SELECT prefix, updated_at, is_current FROM series_state ORDER BY LEFT(prefix, 2), CAST(SUBSTRING(prefix, 4) AS UNSIGNED)");
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode(['success' => true, 'series' => $rows]);
         }

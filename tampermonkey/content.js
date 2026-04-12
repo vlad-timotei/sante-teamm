@@ -274,9 +274,13 @@ async function syncUIWithLocalStorage() {
       row.style.opacity = "1";
       row.style.backgroundColor = "";
 
-      console.log(
-        `➕ Patient ${patientName} not in storage, showing default button`
-      );
+      const testResultCell = row.querySelector('[id^="test-results-"]');
+      if (testResultCell) {
+        testResultCell.innerHTML = "";
+        testResultCell.textContent = "-";
+        testResultCell.style.opacity = "1";
+        testResultCell.style.backgroundColor = "";
+      }
     }
   });
 
