@@ -101,7 +101,7 @@ function makeFiltersCollapsible() {
     sessionSelect.style.cssText = `
       background: #17a2b8;
       color: white;
-      padding: 4px 10px;
+      padding: 6px 12px;
       border-radius: 4px;
       font-size: 12px;
       font-weight: bold;
@@ -109,7 +109,7 @@ function makeFiltersCollapsible() {
       cursor: pointer;
       min-width: 120px;
       float: right;
-      margin: 5px 8px 10px 0;
+      margin: 5px 0 10px 12px;
     `;
     const defaultOpt = document.createElement("option");
     defaultOpt.value = "";
@@ -391,8 +391,8 @@ function createSingleProcessButton() {
 
   const buttonContainer = document.createElement("div");
   buttonContainer.style.cssText = `
-    margin: 0px 0;
-    padding: 0px 12px;
+    margin: 8px 0;
+    padding: 4px 12px;
   `;
 
   buttonContainer.innerHTML = `
