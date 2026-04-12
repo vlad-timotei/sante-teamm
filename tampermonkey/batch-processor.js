@@ -76,9 +76,8 @@ async function addToBatch(element, index, batchBtn) {
     );
   }
 
-  const idPrefix = document.getElementById("id-prefix")?.value.trim();
   if (!idPrefix) {
-    alert("Introduceți un prefix de ID (ex: 25S19) înainte de procesare.");
+    alert("Selectați o sesiune înainte de procesare.");
     return;
   }
 
