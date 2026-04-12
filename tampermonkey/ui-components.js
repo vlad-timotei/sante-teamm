@@ -101,15 +101,16 @@ function makeFiltersCollapsible() {
     sessionSelect.style.cssText = `
       background: #17a2b8;
       color: white;
-      padding: 6px 12px;
+      padding: 4px 10px;
       border-radius: 4px;
       font-size: 12px;
       font-weight: bold;
       border: 2px solid #17a2b8;
       cursor: pointer;
-      min-width: 120px;
+      min-width: 119px;
       float: right;
-      margin: 5px 0 10px 12px;
+      margin: 5px 8px 10px 6px;
+      height: 33px;
     `;
     const defaultOpt = document.createElement("option");
     defaultOpt.value = "";
@@ -410,6 +411,7 @@ function createSingleProcessButton() {
         display: inline-block;
         text-align: center;
         transition: all 0.2s;
+        margin-bottom: 8px;
       " disabled>
         🔍 Analizează (<span id="analyze-count">0</span>)
       </button>
@@ -426,6 +428,7 @@ function createSingleProcessButton() {
         display: inline-block;
         text-align: center;
         transition: all 0.2s;
+        margin-bottom: 8px;
       " disabled>
         📥 Import Teamm (<span id="exported-count">0</span>)
       </button>
