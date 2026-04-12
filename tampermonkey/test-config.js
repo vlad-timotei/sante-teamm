@@ -43,6 +43,8 @@ const TEST_DEFINITIONS = [
   { key: "estradiol", name: "Estradiol", pattern: "Estradiol" },
   { key: "prolactin", name: "Prolactina", pattern: "Prolactin[ăa]?" },
   { key: "peptid-c", name: "Peptid C", pattern: "Peptid(ul)?\\s*C" },
+  { key: "serum-ionized-calcium", name: "Calciu ionic seric", pattern: "Calciu\\s+ionic(\\s+seric)?" },
+  { key: "apolipoprotein-b", name: "Apolipoproteina B", pattern: "Apolipoproteina\\s+B" },
 ];
 
 window.TEST_DEFINITIONS = TEST_DEFINITIONS;
