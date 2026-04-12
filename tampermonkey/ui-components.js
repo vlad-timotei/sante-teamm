@@ -388,35 +388,6 @@ function createSingleProcessButton() {
       ">
         <option value="">-- Sesiune --</option>
       </select>
-      <button type="button" id="sante-add-session" style="
-        background: #17a2b8;
-        color: white;
-        border: 2px solid #17a2b8;
-        padding: 4px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: bold;
-        transition: all 0.2s;
-        line-height: 1;
-      " onmouseover="this.style.background='#138496'" onmouseout="this.style.background='#17a2b8'" title="Sesiune nouă">
-        +
-      </button>
-      <label for="csv-upload" style="
-        background: #28a745;
-        color: white;
-        padding: 6px 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: bold;
-        border: 2px solid #28a745;
-        display: inline-block;
-        text-align: center;
-        transition: all 0.2s;
-      " onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">
-        📁 Alege fișier CSV
-      </label>
       <input type="file" id="csv-upload" accept=".csv" style="display: none;">
       <button type="button" id="sante-analyze-page" style="
         background: #6c757d;

@@ -51,10 +51,16 @@ async function initializeBatchExtension() {
       idPrefixSelect.appendChild(opt);
     });
 
+    // "New session" option at the end
+    const newOpt = document.createElement("option");
+    newOpt.value = "__new__";
+    newOpt.textContent = "+ Sejur nou";
+    idPrefixSelect.appendChild(newOpt);
+
     const prefix = idPrefixSelect.value;
 
     // Load state from server and set up UI
-    if (prefix) {
+    if (prefix && prefix !== "__new__") {
       await window.SyncManager.loadState(prefix);
       await window.SyncManager.setCurrentSeries(prefix);
       await window.migratePatientData();
@@ -65,20 +71,19 @@ async function initializeBatchExtension() {
     // Session change: load fresh state from server
     idPrefixSelect.addEventListener("change", async () => {
       const p = idPrefixSelect.value;
+      if (p === "__new__") {
+        // Open CSV file picker, then revert selection
+        const previousPrefix = window.SyncManager.getCachedState()?.prefix || "";
+        idPrefixSelect.value = previousPrefix;
+        const csvInput = document.getElementById("csv-upload");
+        if (csvInput) csvInput.click();
+        return;
+      }
       if (!p) return;
       await window.SyncManager.loadState(p);
       await window.SyncManager.setCurrentSeries(p);
       await window.syncUIWithLocalStorage();
       window.checkForStoredCSVData?.();
-    });
-  }
-
-  // Add new session button — triggers CSV file picker
-  const addSessionBtn = document.getElementById("sante-add-session");
-  if (addSessionBtn) {
-    addSessionBtn.addEventListener("click", () => {
-      const csvInput = document.getElementById("csv-upload");
-      if (csvInput) csvInput.click();
     });
   }
 }
