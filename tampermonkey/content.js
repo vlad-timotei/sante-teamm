@@ -51,8 +51,9 @@ async function initializeBatchExtension() {
 
   const idPrefixSelect = document.getElementById("id-prefix");
 
-  // Populate session dropdown from DB
+  // Auto-sync sessions from Teamm API, then populate dropdown
   if (idPrefixSelect) {
+    await window.SyncManager.syncSessions();
     const allSeries = await window.SyncManager.fetchAllSeries();
     const currentPrefix = await window.SyncManager.fetchCurrentSeries();
 
@@ -86,50 +87,7 @@ async function initializeBatchExtension() {
     });
   }
 
-  // Wire up bottom buttons
-  const syncBtn = document.getElementById("sante-sync-sessions");
-  if (syncBtn) {
-    syncBtn.onclick = async () => {
-      syncBtn.disabled = true;
-      syncBtn.textContent = "⏳ Se sincronizează...";
-      const year = new Date().getFullYear();
-      const result = await window.SyncManager.syncSessions(year);
-      if (result?.success) {
-        // Refresh dropdown
-        const freshSeries = await window.SyncManager.fetchAllSeries();
-        const select = document.getElementById("id-prefix");
-        const currentVal = select.value;
-        // Remove all options except the first placeholder
-        while (select.options.length > 1) select.remove(1);
-        freshSeries.sort(naturalSortSeries).forEach((s) => {
-          const opt = document.createElement("option");
-          opt.value = s.prefix;
-          opt.textContent = window.formatSessionLabel(s.prefix);
-          if (s.prefix === currentVal) opt.selected = true;
-          select.appendChild(opt);
-        });
-        window.showSuccessToast("Sesiuni sincronizate", `${result.created} noi, ${result.skipped} existente`);
-      }
-      syncBtn.disabled = false;
-      syncBtn.textContent = "🔄 Sincronizează Sesiuni";
-    };
-  }
 
-  const updateIdsBtn = document.getElementById("sante-update-ids");
-  if (updateIdsBtn) {
-    updateIdsBtn.onclick = async () => {
-      const currentPrefix = document.getElementById("id-prefix")?.value;
-      if (!currentPrefix) {
-        alert("Selectați mai întâi o sesiune.");
-        return;
-      }
-      updateIdsBtn.disabled = true;
-      updateIdsBtn.textContent = "⏳ Se actualizează...";
-      await window.fetchAndApplyPatientIds(currentPrefix);
-      updateIdsBtn.disabled = false;
-      updateIdsBtn.textContent = "🔄 Actualizează ID-uri";
-    };
-  }
 }
 
 async function syncUIWithLocalStorage() {

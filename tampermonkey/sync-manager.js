@@ -300,9 +300,9 @@
   // Teamm API proxy calls
   // ----------------------------------------------------------------
 
-  async function syncSessions(year) {
-    setSyncStatus('syncing', `Se sincronizează sesiunile ${year}...`);
-    const result = await apiCall('POST', 'sync_sessions', { year });
+  async function syncSessions() {
+    setSyncStatus('syncing', 'Se sincronizează sesiunile...');
+    const result = await apiCall('POST', 'sync_sessions');
     if (result?.success) {
       setSyncStatus('ok', `${result.created} sesiuni noi, ${result.skipped} existente`);
     } else {

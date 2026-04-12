@@ -61,12 +61,6 @@ $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Add/remove columns if upgrading from older schema
-try { $pdo->exec("ALTER TABLE series_state ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException $e) {}
-try { $pdo->exec("ALTER TABLE series_state ADD COLUMN teamm_session_id VARCHAR(30) AFTER prefix"); } catch (PDOException $e) {}
-try { $pdo->exec("ALTER TABLE series_state DROP COLUMN csv_data"); } catch (PDOException $e) {}
-try { $pdo->exec("ALTER TABLE series_state DROP COLUMN csv_updated_at"); } catch (PDOException $e) {}
-
 
 // --- Verify credentials ---
 $stmt = $pdo->prepare('SELECT password_hash FROM users WHERE username = ?');
@@ -176,16 +170,16 @@ switch ($action) {
 
     // ================================================================
     // POST ?action=sync_sessions       -> fetch sessions from Teamm API
-    //   Body: { "year": 2026 }           and create missing DB entries
+    //   Range: 6 months back to end of current year
     // ================================================================
     case 'sync_sessions':
         if ($method !== 'POST') { http_response_code(405); echo json_encode(['error' => 'POST required']); exit; }
 
-        $body = json_decode(file_get_contents('php://input'), true);
-        $year = (int)($body['year'] ?? date('Y'));
+        $year = (int)date('Y');
         $yy   = substr((string)$year, -2);
 
-        $startDate = urlencode("{$year}-01-01T00:00:00.000Z");
+        $start = new DateTime("-6 months");
+        $startDate = urlencode($start->format('Y-m-d\TH:i:s.000\Z'));
         $endDate   = urlencode("{$year}-12-31T23:59:59.999Z");
         $url = TEAMM_API_BASE . "/sessions?startDate={$startDate}&endDate={$endDate}&start=1&length=50";
 
