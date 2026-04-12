@@ -10,9 +10,7 @@ function getPatientKey(idPrefix, patientName) {
 
 async function loadQueueFromDB() {
   const state = window.SyncManager?.getCachedState();
-  const queue = state?.queue || [];
-  console.log(`📦 Loaded queue from storage: ${queue.length} patients`);
-  return queue;
+  return state?.queue || [];
 }
 
 async function saveQueueToDB(queue) {
@@ -22,7 +20,6 @@ async function saveQueueToDB(queue) {
     return;
   }
   await window.SyncManager.saveState(state.prefix, queue);
-  await window.SyncManager.setCurrentSeries(state.prefix);
   console.log(`💾 Saved queue to server: ${queue.length} patients`);
 }
 
@@ -77,62 +74,6 @@ async function resetExportedStatus() {
   }
 }
 
-async function migratePatientData() {
-  const queue = await loadQueueFromDB();
-  let migrated = 0;
-
-  queue.forEach((patient) => {
-    let needsMigration = false;
-
-    if (patient.exportedTests === undefined || Array.isArray(patient.exportedTests)) {
-      patient.exportedTests = {};
-
-      if (patient.exported && patient.exportedAt) {
-        const testResults = patient.structuredData?.testResults || {};
-        Object.keys(testResults).forEach((key) => {
-          patient.exportedTests[key] = patient.exportedAt;
-        });
-      }
-      needsMigration = true;
-    }
-
-    if (patient.importedStatus === undefined) {
-      patient.importedStatus = "Unknown";
-      needsMigration = true;
-    }
-
-    if (patient.statusChangedSinceImport === undefined) {
-      patient.statusChangedSinceImport = false;
-      needsMigration = true;
-    }
-
-    if (patient.lastRefetchAt === undefined) {
-      patient.lastRefetchAt = null;
-      needsMigration = true;
-    }
-
-    if (patient.needsReexport === undefined) {
-      patient.needsReexport = false;
-      needsMigration = true;
-    }
-
-    if (patient.extractedText !== undefined) {
-      delete patient.extractedText;
-      needsMigration = true;
-    }
-
-    if (needsMigration) {
-      migrated++;
-    }
-  });
-
-  if (migrated > 0) {
-    await saveQueueToDB(queue);
-    console.log(`📦 Migrated ${migrated} patients to new data structure`);
-  } else {
-    console.log("📦 No patient data migration needed");
-  }
-}
 
 // Export to window
 window.getPatientKey = getPatientKey;
@@ -141,4 +82,3 @@ window.saveQueueToDB = saveQueueToDB;
 window.getQueueData = getQueueData;
 window.clearQueue = clearQueue;
 window.resetExportedStatus = resetExportedStatus;
-window.migratePatientData = migratePatientData;

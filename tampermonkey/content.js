@@ -62,7 +62,7 @@ async function initializeBatchExtension() {
     } else {
       allSeries = await window.SyncManager.fetchAllSeries();
     }
-    const currentPrefix = await window.SyncManager.fetchCurrentSeries();
+    const currentPrefix = await GM.getValue('sante-current-prefix', '');
 
     allSeries.sort(naturalSortSeries).forEach((s) => {
       const opt = document.createElement("option");
@@ -80,7 +80,6 @@ async function initializeBatchExtension() {
     if (prefix) {
       idPrefixSelect.disabled = true;
       await window.SyncManager.loadState(prefix);
-      await window.migratePatientData();
       await window.syncUIWithLocalStorage();
       await window.fetchAndApplyPatientIds(prefix);
       idPrefixSelect.disabled = false;
@@ -93,13 +92,12 @@ async function initializeBatchExtension() {
       idPrefixSelect.disabled = true;
       await window.SyncManager.loadState(p);
       await window.SyncManager.setCurrentSeries(p);
+      await GM.setValue('sante-current-prefix', p);
       await window.syncUIWithLocalStorage();
       await window.fetchAndApplyPatientIds(p);
       idPrefixSelect.disabled = false;
     });
   }
-
-
 }
 
 async function syncUIWithLocalStorage() {
