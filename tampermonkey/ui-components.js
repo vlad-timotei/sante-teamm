@@ -723,8 +723,8 @@ function showWarningToast(title, message, persistent = false) {
   const toast = document.createElement("div");
   toast.style.cssText = `
     position: fixed;
-    top: 80px;
-    right: 20px;
+    bottom: 50px;
+    right: 12px;
     background: #ff9800;
     color: white;
     padding: 15px 20px;
@@ -754,8 +754,8 @@ function showSuccessToast(title, message) {
   const toast = document.createElement("div");
   toast.style.cssText = `
     position: fixed;
-    top: 80px;
-    right: 20px;
+    bottom: 50px;
+    right: 12px;
     background: #28a745;
     color: white;
     padding: 15px 20px;
