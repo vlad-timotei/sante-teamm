@@ -707,6 +707,7 @@ async function refetchPatientData(patientKey, rowElement) {
 
       existingPatient.structuredData = existingPatient.structuredData || {};
       existingPatient.structuredData.testResults = mergedTestResults;
+      existingPatient.structuredData.remainingTests = newExtractedData.structuredData.remainingTests || {};
       existingPatient.lastRefetchAt = Date.now();
       existingPatient.exportedTests = oldExportedTests;
       delete existingPatient.extractedText;

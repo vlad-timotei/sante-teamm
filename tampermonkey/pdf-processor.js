@@ -138,38 +138,71 @@ class PDFProcessor {
       }
     });
 
-    if (totalMatches === 0) {
-      console.log("No specific tests found, trying general patterns...");
+    // Always extract remaining/unknown tests via general patterns
+    console.log("Trying general patterns for remaining tests...");
+    const knownKeys = new Set(Object.keys(structuredData.testResults));
+    // Also track known test names/patterns to avoid duplicates with different casing
+    const knownNames = new Set();
+    const stripDiacritics = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    window.TEST_DEFINITIONS.forEach((test) => {
+      const nameLow = test.name.toLowerCase();
+      knownNames.add(nameLow);
+      knownNames.add(stripDiacritics(nameLow));
+      knownNames.add(test.key.toLowerCase());
+      // Also add the name before the first parenthesis, e.g.
+      // "hemoglobina glicozilata (hba1c)" → "hemoglobina glicozilata"
+      // This catches partial matches from lazy regex capture groups
+      const beforeParens = nameLow.replace(/\s*\(.*$/, '').trim();
+      if (beforeParens !== nameLow && beforeParens.length >= 3) {
+        knownNames.add(beforeParens);
+        knownNames.add(stripDiacritics(beforeParens));
+      }
+    });
+    structuredData.remainingTests = {};
 
-      testPatterns.forEach((pattern, index) => {
-        console.log(`Trying general pattern ${index + 1}...`);
-        let match;
-        let patternMatches = 0;
+    testPatterns.forEach((pattern, index) => {
+      console.log(`Trying general pattern ${index + 1}...`);
+      let match;
+      let patternMatches = 0;
 
-        while ((match = pattern.exec(text)) !== null) {
-          patternMatches++;
-          let testName, value;
+      while ((match = pattern.exec(text)) !== null) {
+        patternMatches++;
+        let testName, value;
 
-          const rawValue = match[1];
-          value = rawValue.replace(/[<>]/g, '').trim();
-          testName = match[2] ? match[2].trim() : "Unknown";
-          testName = this.cleanTestName(testName);
+        const rawValue = match[1];
+        value = rawValue.replace(/[<>]/g, '').trim();
+        testName = match[2] ? match[2].trim() : "Unknown";
+        testName = this.cleanTestName(testName);
 
-          console.log(`Found potential test: "${testName}" = ${value} (raw: ${rawValue})`);
+        console.log(`Found potential test: "${testName}" = ${value} (raw: ${rawValue})`);
 
-          if (this.isValidTestName(testName)) {
-            structuredData.testResults[testName] = {
-              value: value,
-            };
-            totalMatches++;
-            console.log(`✅ Added test: ${testName}`);
-          } else {
-            console.log(`❌ Rejected test: "${testName}"`);
-          }
+        const nameLower = testName.toLowerCase();
+        const nameStripped = stripDiacritics(nameLower);
+        const isKnown = knownKeys.has(testName) ||
+          knownNames.has(nameLower) ||
+          knownNames.has(nameStripped) ||
+          structuredData.remainingTests[testName];
+        if (isKnown) {
+          console.log(`⏭️ Skipping "${testName}" - already captured`);
+          continue;
         }
-        console.log(`Pattern ${index + 1} found ${patternMatches} matches`);
-      });
-    }
+
+        // Reject names that look like reference ranges (mostly digits/dots/dashes)
+        if (/^[\d.,\s\-<>]+$/.test(testName)) {
+          console.log(`⏭️ Skipping "${testName}" - looks like a reference range`);
+          continue;
+        }
+
+        if (this.isValidRemainingTestName(testName)) {
+          structuredData.remainingTests[testName] = { value };
+          totalMatches++;
+          console.log(`✅ Added remaining test: ${testName}`);
+        } else {
+          console.log(`❌ Rejected test: "${testName}"`);
+        }
+      }
+      console.log(`Pattern ${index + 1} found ${patternMatches} matches`);
+    });
 
     console.log(`🎯 Total tests extracted: ${totalMatches}`);
     console.log("Final test results:", structuredData.testResults);
@@ -200,6 +233,20 @@ class PDFProcessor {
     );
 
     return hasValidTerm || /^[A-Za-z0-9\s\-()]+$/.test(name);
+  }
+
+  isValidRemainingTestName(name) {
+    if (name.length < 3 || name.length > 60) return false;
+
+    const upperName = name.toUpperCase();
+    const blocklist = ["REZULTATE", "INTERVAL", "BIOLOGIC", "REFERINTA", "DE REFERINTA"];
+    if (blocklist.some(term => upperName.includes(term))) return false;
+    if (["UM", "ANALIZE", "IMUNOLOGIE"].includes(upperName)) return false;
+
+    // Must contain at least one letter (not just numbers/symbols)
+    if (!/[A-Za-z]/.test(name)) return false;
+
+    return true;
   }
 
   cleanTestName(name) {

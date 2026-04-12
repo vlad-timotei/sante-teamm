@@ -632,6 +632,17 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
     </div>`;
   });
 
+  const remainingTests = extractedData.structuredData?.remainingTests || {};
+  const remainingEntries = Object.entries(remainingTests);
+  if (remainingEntries.length > 0) {
+    testsHtml += `<div style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed #ccc; color: #888; font-size: 11px; font-weight: bold;">Alte teste:</div>`;
+    remainingEntries.forEach(([name, testData]) => {
+      testsHtml += `<div style="margin: 1px 0; color: #999; font-size: 11px;">
+        ${name}: <strong>${testData.value || "N/A"}</strong>
+      </div>`;
+    });
+  }
+
   testResultCell.innerHTML =
     statusChangeBadge +
     refetchButton +
@@ -639,7 +650,8 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
     needsReexportBadge +
     testsHtml;
   testResultCell.style.color = "#000";
-  testResultCell.title = `Rezultatele complete pentru acest pacient (${testCount} analize).`;
+  const totalWithRemaining = testCount + remainingEntries.length;
+  testResultCell.title = `Rezultatele complete pentru acest pacient (${testCount} analize exportabile, ${remainingEntries.length} alte teste).`;
 }
 
 function updateTestResultsColumn(elementIndex, extractedData) {
