@@ -176,7 +176,7 @@ async function taAdminSave() {
   if (result?.success) {
     taClearForm();
     taLoadTests();
-    await window.loadTestDefinitions();
+    await window.refreshTestDefinitions();
   } else {
     alert("Eroare la salvare.");
   }
@@ -201,7 +201,7 @@ async function taAdminDelete(key) {
 
   if (result?.success) {
     taLoadTests();
-    await window.loadTestDefinitions();
+    await window.refreshTestDefinitions();
   } else {
     alert("Eroare la ștergere.");
   }
