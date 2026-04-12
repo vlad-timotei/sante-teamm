@@ -1,6 +1,14 @@
 // Content v2.1.0
 // Main initialization — DB-only sync, no localStorage timeouts
 
+// Format "25S7" → "2025 - S7", "25S19" → "2025 - S19"
+function formatSessionLabel(prefix) {
+  const match = prefix.match(/^(\d{2})(S.+)$/i);
+  if (match) return `20${match[1]} - ${match[2]}`;
+  return prefix;
+}
+window.formatSessionLabel = formatSessionLabel;
+
 async function initializeBatchExtension() {
   window.pdfProcessor = new window.PDFProcessor();
   await window.pdfProcessor.loadPDFJS();
@@ -42,20 +50,19 @@ async function initializeBatchExtension() {
     const allSeries = await window.SyncManager.fetchAllSeries();
     const currentPrefix = await window.SyncManager.fetchCurrentSeries();
 
-    allSeries.forEach((s) => {
-      const opt = document.createElement("option");
-      opt.value = s.prefix;
-      const year = s.updated_at ? new Date(s.updated_at).getFullYear() : "";
-      opt.textContent = year ? `${s.prefix} (${year})` : s.prefix;
-      if (s.prefix === currentPrefix) opt.selected = true;
-      idPrefixSelect.appendChild(opt);
-    });
-
-    // "New session" option at the end
+    // "New session" option — always last
     const newOpt = document.createElement("option");
     newOpt.value = "__new__";
     newOpt.textContent = "+ Sejur nou";
     idPrefixSelect.appendChild(newOpt);
+
+    allSeries.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.prefix;
+      opt.textContent = window.formatSessionLabel(s.prefix);
+      if (s.prefix === currentPrefix) opt.selected = true;
+      idPrefixSelect.insertBefore(opt, newOpt);
+    });
 
     const prefix = idPrefixSelect.value;
 

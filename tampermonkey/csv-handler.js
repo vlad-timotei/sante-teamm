@@ -162,8 +162,13 @@ function autoDetectIdPrefix(csvPatients) {
       if (!idPrefixSelect.querySelector(`option[value="${prefix}"]`)) {
         const opt = document.createElement("option");
         opt.value = prefix;
-        opt.textContent = `${prefix} (${new Date().getFullYear()})`;
-        idPrefixSelect.appendChild(opt);
+        opt.textContent = window.formatSessionLabel(prefix);
+        const newOpt = idPrefixSelect.querySelector('option[value="__new__"]');
+        if (newOpt) {
+          idPrefixSelect.insertBefore(opt, newOpt);
+        } else {
+          idPrefixSelect.appendChild(opt);
+        }
       }
       idPrefixSelect.value = prefix;
       console.log(
