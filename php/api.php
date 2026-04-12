@@ -376,6 +376,63 @@ switch ($action) {
     // ================================================================
     case 'test_definitions':
         if ($method === 'GET') {
+            // Auto-seed if table is empty
+            $count = (int)$pdo->query('SELECT COUNT(*) FROM test_definitions')->fetchColumn();
+            if ($count === 0) {
+                $defaults = [
+                    ['25OHD', '25-OH Vitamina D', '25-OH\\s+Vitamina\\s+D'],
+                    ['ACHCV', 'Anticorpi anti-HCV', 'Anticorpi\\s+anti[-\\s]?HCV'],
+                    ['AGHBS', 'Antigen HBs', 'Antigen\\s+HBs'],
+                    ['ALP', 'Fosfataza alcalină', 'Fosfataza\\s+alcalina'],
+                    ['apolipoprotein-b', 'Apolipoproteina B', 'Apolipoproteina\\s+B'],
+                    ['APTT', 'APTT', 'APTT'],
+                    ['ATPO', 'Anti-TPO (Anti-tiroidperoxidaza)', 'Anti[-\\s]?TPO(\\s*\\(Anti[-\\s]?tiroidperoxidaz[ăa]\\))?'],
+                    ['B12', 'Vitamina B12', 'Vitamina\\s+B12'],
+                    ['CA', 'Calciu seric total', 'Calciu seric total'],
+                    ['CA125', 'CA 125', 'CA\\s*125'],
+                    ['CA199', 'CA 19-9', 'CA\\s*19[-\\s]?9'],
+                    ['CALCITONIN', 'Calcitonina', 'Calcitonin[ăa]?'],
+                    ['carcinoembryonic-antigen', 'CEA (antigen carcinoembrionar)', 'CEA(\\s*\\(antigen\\s+carcinoembrio[nt]ar\\))?'],
+                    ['cortisol', 'Cortizol', 'Cortizol'],
+                    ['CRP', 'Proteina C reactivă (CRP)', 'Protein[ăa]?\\s+C\\s+[Rr]eactiv[ăa]?,?\\s+cantitativ\\s*\\(CRP\\)'],
+                    ['ctlf', 'Capacitatea totala de legare a fierului', 'Capacitatea\\s+totala\\s+de\\s+legare\\s+a\\s+fierului\\s+\\(CTLF\\)'],
+                    ['d-dimeri', 'D-Dimeri', 'D[\\s-]?Dimer[i]?'],
+                    ['DBIL', 'Bilirubina directă', 'Bilirubin[ăa]?\\s+direct[ăa]?'],
+                    ['estradiol', 'Estradiol', 'Estradiol'],
+                    ['FERITINA', 'Feritina', 'Feritina'],
+                    ['FT3', 'FT3', 'FT3'],
+                    ['FT4', 'FT4', 'FT4'],
+                    ['HBA1C', 'Hemoglobina glicozilată (HbA1c)', 'Hemoglobina glicozilata\\s*\\(HbA1c\\)'],
+                    ['hiv-agab-combo', 'Testare HIV: anti HIV 1+2/Ag. p24 HIV-1', 'Testare\\s+HIV'],
+                    ['HOMA', 'Indice HOMA', '((Calcul\\s+)?Indice\\s+HOMA|HOMA)'],
+                    ['HOMOCYSTEIN', 'Homocisteina', 'Homocistein[ăa]?'],
+                    ['hsCRP', 'Proteina C Reactivă HS', 'Protein[ăa]?\\s+C\\s+[Rr]eactiv[ăa]?\\s+HS'],
+                    ['IBIL', 'Bilirubina indirectă', 'Bilirubin[ăa]?\\s+indirect[ăa]?'],
+                    ['INR', 'INR', 'INR'],
+                    ['INS', 'Insulina', 'Insulin[ăa]?'],
+                    ['IRON', 'Sideremie', 'Sideremie(\\s*\\(Fier\\s+seric\\))?'],
+                    ['K', 'Potasiu seric', 'Potasiu seric'],
+                    ['lipase', 'Lipaza', 'Lipaz[ăa]?'],
+                    ['MG', 'Magneziu seric', 'Magneziu seric'],
+                    ['na', 'Sodiu seric', 'Sodiu(\\s+seric)?'],
+                    ['peptid-c', 'Peptid C', 'Peptid(ul)?\\s*C'],
+                    ['prolactin', 'Prolactina', 'Prolactin[ăa]?'],
+                    ['PSA', 'PSA', 'PSA'],
+                    ['PTH', 'Intact PTH (Parathormon)', 'Intact\\s+PTH(\\s*\\(Parathormon\\))?'],
+                    ['serum-amylase', 'Amilaza serica', 'Amilaz[ăa]?\\s+seric[ăa]?'],
+                    ['serum-folate', 'Acid folic (folat) seric', 'Acid\\s+folic(\\s*\\(folat\\))?\\s+seric'],
+                    ['serum-ionized-calcium', 'Calciu ionic seric', 'Calciu\\s+ionic(\\s+seric)?'],
+                    ['serum-total-protein', 'Proteine totale serice', 'Proteine\\s+totale\\s+serice'],
+                    ['TSB', 'Bilirubina totală', 'Bilirubin[ăa]?\\s+total[ăa]?'],
+                    ['TSH', 'TSH', 'TSH'],
+                    ['VSH', 'VSH', 'VSH'],
+                ];
+                $seed = $pdo->prepare('INSERT INTO test_definitions (`key`, name, pattern) VALUES (?, ?, ?)');
+                foreach ($defaults as $t) {
+                    $seed->execute([$t[0], $t[1], $t[2]]);
+                }
+            }
+
             $stmt = $pdo->query('SELECT `key`, name, pattern FROM test_definitions ORDER BY `key`');
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode(['success' => true, 'tests' => $rows]);
