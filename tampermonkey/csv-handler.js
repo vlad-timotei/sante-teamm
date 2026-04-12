@@ -3,30 +3,6 @@
 
 window.csvPatientData = [];
 
-async function storeCSVData(idPrefix, csvData) {
-  const state = window.SyncManager?.getCachedState();
-  await window.SyncManager.saveState(
-    idPrefix,
-    state?.queue || [],
-    csvData,
-    Date.now(),
-  );
-  console.log(
-    `💾 Stored patient data for prefix ${idPrefix}: ${csvData.length} patients`,
-  );
-}
-
-function getStoredCSVData(idPrefix) {
-  const state = window.SyncManager?.getCachedState();
-  if (state?.prefix === idPrefix && state.csv_data) {
-    console.log(
-      `📱 Retrieved patient data for prefix ${idPrefix}: ${state.csv_data.length} patients`,
-    );
-    return state.csv_data;
-  }
-  return null;
-}
-
 function clearPatientInputs() {
   document.querySelectorAll('input[id^="patient-text-"]').forEach((input) => {
     input.value = "";
@@ -35,24 +11,9 @@ function clearPatientInputs() {
   document.querySelectorAll(".csv-match").forEach((el) => el.remove());
 }
 
-// Fetch patient IDs from Teamm API and apply matching
-async function fetchAndApplyPatientIds(prefix, force = false) {
-  const existingData = getStoredCSVData(prefix);
-  if (existingData && existingData.length > 0 && !force) {
-    const missingIds = existingData.some((p) => !p.fullId);
-    if (missingIds) {
-      console.log(`⚠️ Some patients missing bookingId for ${prefix}, re-fetching...`);
-      // Fall through to fetch from API
-    } else {
-      console.log(`✅ Patient data already loaded for ${prefix}, applying...`);
-      window.csvPatientData = existingData;
-      clearPatientInputs();
-      const matchResults = matchCSVToTablePatients(window.csvPatientData);
-      displayMatchResults(matchResults);
-      setTimeout(() => window.updateDownloadCount?.(), 100);
-      return;
-    }
-  }
+// Always fetch fresh patient IDs from Teamm API and apply matching
+async function fetchAndApplyPatientIds(prefix) {
+  if (!prefix) return;
 
   console.log(`🔄 Fetching patient IDs from API for ${prefix}...`);
   const result = await window.SyncManager.fetchGuests(prefix);
@@ -63,7 +24,6 @@ async function fetchAndApplyPatientIds(prefix, force = false) {
   }
 
   window.csvPatientData = result.patients;
-  await storeCSVData(prefix, result.patients);
 
   clearPatientInputs();
   const matchResults = matchCSVToTablePatients(window.csvPatientData);
@@ -77,12 +37,6 @@ async function fetchAndApplyPatientIds(prefix, force = false) {
   );
 
   setTimeout(() => window.updateDownloadCount?.(), 100);
-}
-
-// Called on session select — only fetches if data is missing
-async function ensurePatientIds(prefix) {
-  if (!prefix) return;
-  await fetchAndApplyPatientIds(prefix, false);
 }
 
 function matchCSVToTablePatients(csvPatients) {
@@ -375,11 +329,8 @@ function findBatchButtonForInput(input) {
 }
 
 // Export to window
-window.storeCSVData = storeCSVData;
-window.getStoredCSVData = getStoredCSVData;
 window.clearPatientInputs = clearPatientInputs;
 window.fetchAndApplyPatientIds = fetchAndApplyPatientIds;
-window.ensurePatientIds = ensurePatientIds;
 window.matchCSVToTablePatients = matchCSVToTablePatients;
 window.normalizedName = normalizedName;
 window.calculateNameSimilarity = calculateNameSimilarity;

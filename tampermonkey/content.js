@@ -72,7 +72,7 @@ async function initializeBatchExtension() {
       await window.SyncManager.setCurrentSeries(prefix);
       await window.migratePatientData();
       await window.syncUIWithLocalStorage();
-      await window.ensurePatientIds(prefix);
+      await window.fetchAndApplyPatientIds(prefix);
     }
 
     // Session change: load fresh state from server
@@ -82,7 +82,7 @@ async function initializeBatchExtension() {
       await window.SyncManager.loadState(p);
       await window.SyncManager.setCurrentSeries(p);
       await window.syncUIWithLocalStorage();
-      await window.ensurePatientIds(p);
+      await window.fetchAndApplyPatientIds(p);
     });
   }
 
@@ -125,7 +125,7 @@ async function initializeBatchExtension() {
       }
       updateIdsBtn.disabled = true;
       updateIdsBtn.textContent = "⏳ Se actualizează...";
-      await window.fetchAndApplyPatientIds(currentPrefix, true);
+      await window.fetchAndApplyPatientIds(currentPrefix);
       updateIdsBtn.disabled = false;
       updateIdsBtn.textContent = "🔄 Actualizează ID-uri";
     };

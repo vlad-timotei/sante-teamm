@@ -53,8 +53,6 @@ $pdo->exec("
     CREATE TABLE IF NOT EXISTS series_state (
         prefix            VARCHAR(30)  NOT NULL PRIMARY KEY,
         teamm_session_id  VARCHAR(30),
-        csv_data          LONGTEXT,
-        csv_updated_at    BIGINT,
         export_queue      LONGTEXT,
         updated_at        DATETIME     NOT NULL,
         updated_by        VARCHAR(64),
@@ -63,13 +61,11 @@ $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Add columns if upgrading from older schema
-try {
-    $pdo->exec("ALTER TABLE series_state ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 0");
-} catch (PDOException $e) { /* already exists */ }
-try {
-    $pdo->exec("ALTER TABLE series_state ADD COLUMN teamm_session_id VARCHAR(30) AFTER prefix");
-} catch (PDOException $e) { /* already exists */ }
+// Add/remove columns if upgrading from older schema
+try { $pdo->exec("ALTER TABLE series_state ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE series_state ADD COLUMN teamm_session_id VARCHAR(30) AFTER prefix"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE series_state DROP COLUMN csv_data"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE series_state DROP COLUMN csv_updated_at"); } catch (PDOException $e) {}
 
 
 // --- Verify credentials ---
@@ -100,7 +96,7 @@ switch ($action) {
         if ($method === 'GET') {
             $prefix = trim($_GET['prefix'] ?? '');
             if (!$prefix) {
-                echo json_encode(['success' => true, 'export_queue' => [], 'csv_data' => null, 'csv_updated_at' => null]);
+                echo json_encode(['success' => true, 'export_queue' => []]);
                 exit;
             }
 
@@ -112,11 +108,9 @@ switch ($action) {
                 echo json_encode([
                     'success'        => true,
                     'export_queue'   => json_decode($row['export_queue'], true) ?? [],
-                    'csv_data'       => json_decode($row['csv_data'], true),
-                    'csv_updated_at' => (int)$row['csv_updated_at'],
                 ]);
             } else {
-                echo json_encode(['success' => true, 'export_queue' => [], 'csv_data' => null, 'csv_updated_at' => null]);
+                echo json_encode(['success' => true, 'export_queue' => []]);
             }
 
         } elseif ($method === 'POST') {
@@ -125,23 +119,19 @@ switch ($action) {
 
             $prefix       = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['prefix'] ?? ''), 0, 30);
             $exportQueue  = json_encode($body['export_queue'] ?? []);
-            $csvData      = isset($body['csv_data']) ? json_encode($body['csv_data']) : null;
-            $csvUpdatedAt = isset($body['csv_updated_at']) ? (int)$body['csv_updated_at'] : null;
 
             if (!$prefix) { http_response_code(400); echo json_encode(['error' => 'Missing prefix']); exit; }
 
             $stmt = $pdo->prepare('
-                INSERT INTO series_state (prefix, csv_data, csv_updated_at, export_queue, updated_at, updated_by, device_name)
-                VALUES (?, ?, ?, ?, NOW(), ?, ?)
+                INSERT INTO series_state (prefix, export_queue, updated_at, updated_by, device_name)
+                VALUES (?, ?, NOW(), ?, ?)
                 ON DUPLICATE KEY UPDATE
-                    csv_data       = VALUES(csv_data),
-                    csv_updated_at = VALUES(csv_updated_at),
                     export_queue   = VALUES(export_queue),
                     updated_at     = NOW(),
                     updated_by     = VALUES(updated_by),
                     device_name    = VALUES(device_name)
             ');
-            $stmt->execute([$prefix, $csvData, $csvUpdatedAt, $exportQueue, $deviceId, $deviceName]);
+            $stmt->execute([$prefix, $exportQueue, $deviceId, $deviceName]);
             echo json_encode(['success' => true]);
         }
         break;
@@ -303,7 +293,7 @@ switch ($action) {
         $teammData = json_decode($response, true);
         $guests    = $teammData['data'] ?? [];
 
-        // Convert to csv_data format: [{name, fullId}]
+        // Convert to [{name, fullId}]
         $csvData = [];
         foreach ($guests as $guest) {
             $name = trim(($guest['lastName'] ?? '') . ' ' . ($guest['firstName'] ?? ''));

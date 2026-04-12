@@ -7,7 +7,7 @@
   let _apiBase         = null;
   let _cachedDeviceId  = null;
   let _cachedBasicAuth = null;
-  let _state           = null; // { prefix, queue, csv_data, csv_updated_at }
+  let _state           = null; // { prefix, queue }
 
   // ----------------------------------------------------------------
   // Device identity
@@ -247,29 +247,24 @@
 
     _state = {
       prefix,
-      queue:          result.export_queue   || [],
-      csv_data:       result.csv_data        || null,
-      csv_updated_at: result.csv_updated_at  || null,
+      queue: result.export_queue || [],
     };
 
-    const csvInfo = _state.csv_data ? `${_state.csv_data.length} CSV rows` : 'no CSV';
     setSyncStatus('ok', `Încărcat ${prefix}`);
-    console.log(`[Sync] Loaded ${_state.queue.length} patients, ${csvInfo}`);
+    console.log(`[Sync] Loaded ${_state.queue.length} patients`);
   }
 
-  async function saveState(prefix, queue, csvData, csvUpdatedAt) {
+  async function saveState(prefix, queue) {
     if (!prefix) return;
 
     // Update cache immediately so reads see the new value right away
-    _state = { prefix, queue, csv_data: csvData || null, csv_updated_at: csvUpdatedAt || null };
+    _state = { prefix, queue };
 
     setSyncStatus('syncing', `Se salvează ${prefix}...`);
 
     const result = await apiCall('POST', 'state', {
       prefix,
-      export_queue:   queue,
-      csv_data:       csvData        || null,
-      csv_updated_at: csvUpdatedAt   || null,
+      export_queue: queue,
     });
 
     if (result?.success) {

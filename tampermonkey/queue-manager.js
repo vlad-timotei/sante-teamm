@@ -21,12 +21,7 @@ async function saveQueueToDB(queue) {
     console.warn('💾 Cannot save queue: no active series loaded');
     return;
   }
-  await window.SyncManager.saveState(
-    state.prefix,
-    queue,
-    state.csv_data,
-    state.csv_updated_at
-  );
+  await window.SyncManager.saveState(state.prefix, queue);
   await window.SyncManager.setCurrentSeries(state.prefix);
   console.log(`💾 Saved queue to server: ${queue.length} patients`);
 }
@@ -41,7 +36,7 @@ async function clearQueue() {
     console.warn('🗑️ Cannot clear queue: no active series loaded');
     return;
   }
-  await window.SyncManager.saveState(state.prefix, [], state.csv_data, state.csv_updated_at);
+  await window.SyncManager.saveState(state.prefix, []);
   console.log("🗑️ Queue cleared");
 }
 
