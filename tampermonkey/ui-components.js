@@ -12,6 +12,33 @@ function hideCharismaFooter() {
       console.log("✅ Hidden Charisma footer");
     }
   });
+
+  // Move welcome/logout row to bottom of page
+  const welcomeLabel = document.getElementById("ctl00_contentMain_lblWelcome");
+  if (welcomeLabel) {
+    const welcomeRow = welcomeLabel.closest(".row");
+    if (welcomeRow) {
+      const welcomeItems = welcomeRow.querySelectorAll(".col-md-3, .col-maria, .col-md-1, .col-md-2");
+      if (welcomeItems.length > 0) {
+        const bottomBar = document.createElement("div");
+        bottomBar.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 15px;
+          margin-top: 20px;
+          border-top: 1px solid #dee2e6;
+          font-size: 12px;
+          color: #666;
+        `;
+        welcomeItems.forEach((el) => {
+          el.style.cssText = "";
+          bottomBar.appendChild(el);
+        });
+        document.querySelector(".form-horizontal")?.appendChild(bottomBar);
+      }
+    }
+  }
 }
 
 function makeFiltersCollapsible() {
@@ -95,7 +122,21 @@ function makeFiltersCollapsible() {
     '.form-horizontal div > input[id*="btnFilter"]',
   );
   if (quickFilterButtons && quickFilterButtons.parentElement) {
-    // Session dropdown — placed to the left of the Filtre button
+    const filterParent = quickFilterButtons.parentElement;
+
+    // Create a clean controls row below the quick filters
+    const controlsRow = document.createElement("div");
+    controlsRow.style.cssText = `
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0 10px;
+    `;
+
+    toggleButton.style.float = "none";
+    toggleButton.style.margin = "0";
+
     const sessionSelect = document.createElement("select");
     sessionSelect.id = "id-prefix";
     sessionSelect.style.cssText = `
@@ -108,8 +149,6 @@ function makeFiltersCollapsible() {
       border: 2px solid #17a2b8;
       cursor: pointer;
       min-width: 119px;
-      float: right;
-      margin: 5px 8px 10px 6px;
       height: 33px;
     `;
     const defaultOpt = document.createElement("option");
@@ -117,8 +156,9 @@ function makeFiltersCollapsible() {
     defaultOpt.textContent = "-- Sesiune --";
     sessionSelect.appendChild(defaultOpt);
 
-    quickFilterButtons.parentElement.appendChild(sessionSelect);
-    quickFilterButtons.parentElement.appendChild(toggleButton);
+    controlsRow.appendChild(toggleButton);
+    controlsRow.appendChild(sessionSelect);
+    filterParent.appendChild(controlsRow);
   }
 
   formGroups.forEach((group) => {
