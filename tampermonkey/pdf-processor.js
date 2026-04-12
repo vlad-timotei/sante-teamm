@@ -99,28 +99,19 @@ class PDFProcessor {
     console.log("Looking in text:", text.substring(0, 2000));
 
     const testPatterns = [
-      // Value-first patterns (original)
       /([<>]?\s*[0-9.,]+)\s+([A-Za-z0-9\s\-()]{5,50}?)\s+\[([0-9.,\s\-<>]+)\]/g,
       /([<>]?\s*[0-9.,]+)\s+Feritina\s+\[([0-9.,\s\-<>]+)\]\s+([a-zA-Z\/]+)/g,
       /([<>]?\s*[0-9.,]+)\s+\^?\s*Vitamina\s+B12\s+\[([0-9.,\s\-<>]+)\]\s+([a-zA-Z\/]+)/g,
       /([<>]?\s*[0-9.,]+)\s+\^?\s*25-OH\s+Vitamina\s+D\s+\[([0-9.,\s\-<>]+)\]/g,
       /([<>]?\s*[0-9.,]+)\s+\^?\s*([A-Za-z0-9\s\-]{3,25}?)\s+\[([0-9.,\s\-<>]+)\]\s*([a-zA-Z\/]*)/g,
       /([<>]?\s*[0-9.,]+)\s+([A-Za-z0-9\s\-]{3,25}?)\s+\[([0-9.,\s\-<>]+)\]\s*([a-zA-Z\/]*)/g,
-      // Name-first pattern: "TestName value unit [range]"
-      /([A-Za-z][A-Za-z0-9\s\-()]{2,49}?)\s+([<>]?\s*[0-9.,]+)\s+[^\[]*?\[([0-9.,\s\-<>]+)\]/g,
     ];
 
     let totalMatches = 0;
 
     const createTestPattern = (testName) => {
       const pattern = new RegExp(`([<>]?\\s*[0-9.,]+)\\s+\\^?\\s*${testName}`, 'g');
-      return pattern;
-    };
-
-    const createTestPatternNameFirst = (testName) => {
-      // Allow optional parenthetical text between name and value
-      // e.g., "Sideremie (Fier seric) 34" or "Magneziu seric 1.98"
-      const pattern = new RegExp(`${testName}(?:\\s*\\([^)]*\\))?\\s+([<>]?\\s*[0-9.,]+)`, 'g');
+      console.log(`Created pattern for "${testName}": ${pattern.source}`);
       return pattern;
     };
 
@@ -129,7 +120,6 @@ class PDFProcessor {
       const pattern = createTestPattern(test.pattern);
       console.log(`Looking for ${test.name} with pattern: ${pattern.source}`);
       let match;
-      let found = false;
       while ((match = pattern.exec(text)) !== null) {
         const rawValue = match[1];
         const cleanValue = rawValue.replace(/[<>]/g, '').trim();
@@ -144,30 +134,7 @@ class PDFProcessor {
           value: cleanValue,
         };
         totalMatches++;
-        found = true;
         console.log(`✅ Found ${test.key}: ${cleanValue} (raw: ${rawValue})`);
-      }
-
-      // Fallback: try name-before-value order (e.g., "Sideremie (Fier seric) 34")
-      if (!found) {
-        const patternNF = createTestPatternNameFirst(test.pattern);
-        console.log(`Retrying ${test.name} with name-first pattern: ${patternNF.source}`);
-        while ((match = patternNF.exec(text)) !== null) {
-          const rawValue = match[match.length - 1];
-          const cleanValue = rawValue.replace(/[<>]/g, '').trim();
-          const hasComparisonSymbol = /[<>]/.test(rawValue);
-
-          if (!this.isValidTestValue(cleanValue, hasComparisonSymbol)) {
-            console.log(`❌ Rejected invalid value for ${test.name}: "${cleanValue}"`);
-            continue;
-          }
-
-          structuredData.testResults[test.key] = {
-            value: cleanValue,
-          };
-          totalMatches++;
-          console.log(`✅ Found ${test.key}: ${cleanValue} (raw: ${rawValue}, name-first)`);
-        }
       }
     });
 
@@ -198,23 +165,16 @@ class PDFProcessor {
       let match;
       let patternMatches = 0;
 
-      // Last pattern is name-first: match[1]=name, match[2]=value
-      const isNameFirst = index === testPatterns.length - 1;
-
       while ((match = pattern.exec(text)) !== null) {
         patternMatches++;
         let testName, value;
 
-        if (isNameFirst) {
-          testName = match[1] ? match[1].trim() : "Unknown";
-          value = match[2] ? match[2].replace(/[<>]/g, '').trim() : "";
-        } else {
-          value = match[1] ? match[1].replace(/[<>]/g, '').trim() : "";
-          testName = match[2] ? match[2].trim() : "Unknown";
-        }
+        const rawValue = match[1];
+        value = rawValue.replace(/[<>]/g, '').trim();
+        testName = match[2] ? match[2].trim() : "Unknown";
         testName = this.cleanTestName(testName);
 
-        console.log(`Found potential test: "${testName}" = ${value}`);
+        console.log(`Found potential test: "${testName}" = ${value} (raw: ${rawValue})`);
 
         const nameLower = testName.toLowerCase();
         const nameStripped = stripDiacritics(nameLower);
