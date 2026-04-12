@@ -178,8 +178,7 @@ switch ($action) {
         $year = (int)date('Y');
         $yy   = substr((string)$year, -2);
 
-        $start = new DateTime("-6 months");
-        $startDate = urlencode($start->format('Y-m-d\TH:i:s.000\Z'));
+        $startDate = urlencode("{$year}-01-01T00:00:00.000Z");
         $endDate   = urlencode("{$year}-12-31T23:59:59.999Z");
         $url = TEAMM_API_BASE . "/sessions?startDate={$startDate}&endDate={$endDate}&start=1&length=50";
 

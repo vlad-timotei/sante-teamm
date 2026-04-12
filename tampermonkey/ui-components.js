@@ -95,6 +95,28 @@ function makeFiltersCollapsible() {
     '.form-horizontal div > input[id*="btnFilter"]',
   );
   if (quickFilterButtons && quickFilterButtons.parentElement) {
+    // Session dropdown — placed to the left of the Filtre button
+    const sessionSelect = document.createElement("select");
+    sessionSelect.id = "id-prefix";
+    sessionSelect.style.cssText = `
+      background: #17a2b8;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 2px solid #17a2b8;
+      cursor: pointer;
+      min-width: 120px;
+      float: right;
+      margin: 5px 8px 10px 0;
+    `;
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "-- Sesiune --";
+    sessionSelect.appendChild(defaultOpt);
+
+    quickFilterButtons.parentElement.appendChild(sessionSelect);
     quickFilterButtons.parentElement.appendChild(toggleButton);
   }
 
@@ -375,19 +397,6 @@ function createSingleProcessButton() {
 
   buttonContainer.innerHTML = `
     <div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
-      <select id="id-prefix" style="
-        background: #17a2b8;
-        color: white;
-        padding: 4px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: bold;
-        border: 2px solid #17a2b8;
-        cursor: pointer;
-        min-width: 120px;
-      ">
-        <option value="">-- Sesiune --</option>
-      </select>
       <button type="button" id="sante-analyze-page" style="
         background: #6c757d;
         color: white;

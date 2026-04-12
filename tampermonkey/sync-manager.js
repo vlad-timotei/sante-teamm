@@ -304,7 +304,10 @@
     setSyncStatus('syncing', 'Se sincronizează sesiunile...');
     const result = await apiCall('POST', 'sync_sessions');
     if (result?.success) {
-      setSyncStatus('ok', `${result.created} sesiuni noi, ${result.skipped} existente`);
+      const msg = result.created > 0
+        ? `${result.created} sesiuni noi, ${result.skipped} existente`
+        : 'Sesiuni încărcate!';
+      setSyncStatus('ok', msg);
     } else {
       setSyncStatus('error', 'Sincronizare sesiuni eșuată');
     }
