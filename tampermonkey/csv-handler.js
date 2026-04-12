@@ -39,13 +39,19 @@ function clearPatientInputs() {
 async function fetchAndApplyPatientIds(prefix, force = false) {
   const existingData = getStoredCSVData(prefix);
   if (existingData && existingData.length > 0 && !force) {
-    console.log(`✅ Patient data already loaded for ${prefix}, applying...`);
-    window.csvPatientData = existingData;
-    clearPatientInputs();
-    const matchResults = matchCSVToTablePatients(window.csvPatientData);
-    displayMatchResults(matchResults);
-    setTimeout(() => window.updateDownloadCount?.(), 100);
-    return;
+    const missingIds = existingData.some((p) => !p.fullId);
+    if (missingIds) {
+      console.log(`⚠️ Some patients missing bookingId for ${prefix}, re-fetching...`);
+      // Fall through to fetch from API
+    } else {
+      console.log(`✅ Patient data already loaded for ${prefix}, applying...`);
+      window.csvPatientData = existingData;
+      clearPatientInputs();
+      const matchResults = matchCSVToTablePatients(window.csvPatientData);
+      displayMatchResults(matchResults);
+      setTimeout(() => window.updateDownloadCount?.(), 100);
+      return;
+    }
   }
 
   console.log(`🔄 Fetching patient IDs from API for ${prefix}...`);
