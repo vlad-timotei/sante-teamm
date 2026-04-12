@@ -1,4 +1,5 @@
-// CSV upload, parsing, and patient matching functions
+// Patient ID matching and API data handling
+// Replaces CSV upload with Teamm API integration
 
 window.csvPatientData = [];
 
@@ -11,7 +12,7 @@ async function storeCSVData(idPrefix, csvData) {
     Date.now(),
   );
   console.log(
-    `💾 Stored CSV data for prefix ${idPrefix}: ${csvData.length} patients`,
+    `💾 Stored patient data for prefix ${idPrefix}: ${csvData.length} patients`,
   );
 }
 
@@ -19,31 +20,11 @@ function getStoredCSVData(idPrefix) {
   const state = window.SyncManager?.getCachedState();
   if (state?.prefix === idPrefix && state.csv_data) {
     console.log(
-      `📱 Retrieved CSV data for prefix ${idPrefix}: ${state.csv_data.length} patients`,
+      `📱 Retrieved patient data for prefix ${idPrefix}: ${state.csv_data.length} patients`,
     );
     return state.csv_data;
   }
   return null;
-}
-
-async function clearStoredCSVData(idPrefix) {
-  const state = window.SyncManager?.getCachedState();
-  await window.SyncManager.saveState(
-    idPrefix,
-    state?.queue || [],
-    null,
-    Date.now(),
-  );
-  await window.SyncManager.clearCurrentSeries();
-  console.log(`🗑️ Cleared CSV data for prefix ${idPrefix}`);
-}
-
-function tryLoadAnyStoredData() {
-  const idPrefixInput = document.getElementById("id-prefix");
-  if (idPrefixInput?.value.trim()) {
-    checkForStoredCSVData();
-  }
-  // If no prefix, content.js init handles fetching current series from server
 }
 
 function clearPatientInputs() {
@@ -54,291 +35,48 @@ function clearPatientInputs() {
   document.querySelectorAll(".csv-match").forEach((el) => el.remove());
 }
 
-function checkForStoredCSVData() {
-  console.log("🔍 Checking for stored CSV data...");
-
-  const idPrefixInput = document.getElementById("id-prefix");
-  if (!idPrefixInput) {
-    console.log("❌ ID prefix input not found");
-    return;
-  }
-
-  const idPrefix = idPrefixInput.value.trim();
-  if (!idPrefix) {
-    console.log("❌ No ID prefix entered");
-    return;
-  }
-
-  console.log(`🔍 Looking for stored data for prefix: ${idPrefix}`);
-  const storedData = getStoredCSVData(idPrefix);
-
-  clearPatientInputs();
-
-  if (storedData && storedData.length > 0) {
-    console.log(`✅ Found stored CSV data for ${idPrefix}, loading...`);
-    window.csvPatientData = storedData;
-    updateCSVButton(idPrefix, storedData.length, true);
-
-    const matchResults = matchCSVToTablePatients(window.csvPatientData);
-    displayMatchResults(matchResults);
-
-    console.log(
-      `🔄 Auto-loaded stored CSV data for ${idPrefix} and performed matching`,
-    );
-
-    setTimeout(() => window.updateDownloadCount(), 100);
-  } else {
-    console.log(`❌ No stored CSV data found for prefix: ${idPrefix}`);
-  }
-}
-
-function updateCSVButton(idPrefix, patientCount, isStored) {
-  const csvLabel = document.querySelector('label[for="csv-upload"]');
-  if (!csvLabel) return;
-
-  if (isStored) {
-    csvLabel.innerHTML = `CSV: ${patientCount} pacienți <span id="clear-csv-data" style="
-      margin-left: 8px;
-      background: #dc3545;
-      color: white;
-      border-radius: 50%;
-      width: 18px;
-      height: 18px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      cursor: pointer;
-      font-weight: bold;
-    " title="Șterge datele CSV stocate">✕</span>`;
-    csvLabel.style.background = "#17a2b8";
-    csvLabel.style.borderColor = "#17a2b8";
-    csvLabel.title = `${patientCount} pacienți din CSV. Click pentru a înlocui.`;
-
-    setTimeout(() => {
-      const clearButton = document.getElementById("clear-csv-data");
-      if (clearButton) {
-        clearButton.onclick = async function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          await clearStoredCSVData(idPrefix);
-          window.csvPatientData = [];
-          updateCSVButton("", 0, false);
-
-          await window.updateExportCount();
-          console.log(`🗑️ Cleared stored CSV data and reset interface`);
-        };
-      }
-    }, 10);
-  } else {
-    csvLabel.innerHTML = "📁 Alege fișier CSV";
-    csvLabel.style.background = "#28a745";
-    csvLabel.style.borderColor = "#28a745";
-    csvLabel.title = "Click pentru a încărca un fișier CSV nou";
-  }
-}
-
-function autoDetectIdPrefix(csvPatients) {
-  if (csvPatients.length === 0) return null;
-
-  // Get first valid ID (minimum 4 chars for format YYSN + NN)
-  const firstValidPatient = csvPatients.find(
-    (p) => p.fullId && p.fullId.length >= 4,
-  );
-  if (!firstValidPatient) return null;
-
-  // Prefix is everything except the last 2 digits (patient number)
-  const prefix = firstValidPatient.fullId.slice(0, -2);
-
-  console.log(
-    `🔍 Detected prefix: "${prefix}" from ID "${firstValidPatient.fullId}"`,
-  );
-
-  if (prefix) {
-    const idPrefixSelect = document.getElementById("id-prefix");
-    if (idPrefixSelect) {
-      // Add option if it doesn't exist in the dropdown yet
-      if (!idPrefixSelect.querySelector(`option[value="${prefix}"]`)) {
-        const opt = document.createElement("option");
-        opt.value = prefix;
-        opt.textContent = window.formatSessionLabel(prefix);
-        const newOpt = idPrefixSelect.querySelector('option[value="__new__"]');
-        if (newOpt) {
-          idPrefixSelect.insertBefore(opt, newOpt);
-        } else {
-          idPrefixSelect.appendChild(opt);
-        }
-      }
-      idPrefixSelect.value = prefix;
-      console.log(
-        `✅ Auto-detected ID prefix: ${prefix} (${csvPatients.length} patients)`,
-      );
-    }
-
-    return prefix;
-  }
-  return null;
-}
-
-async function handleCSVUpload(event) {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  const fileInput = document.getElementById("csv-upload");
-  const file = fileInput.files[0];
-
-  if (!file) {
-    alert("Selectați mai întâi un fișier CSV.");
-    return;
-  }
-
-  if (!file.name.toLowerCase().endsWith(".csv")) {
-    alert("Selectați un fișier CSV (extensie .csv necesară).");
-    return;
-  }
-
-  try {
-    const csvContent = await readFileAsText(file);
-    window.csvPatientData = parseCSV(csvContent);
-
-    if (window.csvPatientData.length === 0) {
-      alert("Nu s-au găsit date de pacienți în fișierul CSV.");
-      return;
-    }
-
-    const detectedPrefix = autoDetectIdPrefix(window.csvPatientData);
-
-    if (detectedPrefix) {
-      // Ensure state is loaded for this prefix before saving CSV
-      if (window.SyncManager?.getCachedState()?.prefix !== detectedPrefix) {
-        await window.SyncManager.loadState(detectedPrefix);
-        // If load failed, _state.prefix won't match — abort to avoid data loss
-        if (window.SyncManager?.getCachedState()?.prefix !== detectedPrefix) {
-          alert(
-            `Nu s-a putut încărca seria "${detectedPrefix}" de pe server. Verificați conexiunea și încercați din nou.`,
-          );
-          return;
-        }
-      }
-      await storeCSVData(detectedPrefix, window.csvPatientData);
-      await window.SyncManager.setCurrentSeries(detectedPrefix);
-      updateCSVButton(detectedPrefix, window.csvPatientData.length, true);
-      await window.syncUIWithLocalStorage?.();
-    }
-
+// Fetch patient IDs from Teamm API and apply matching
+async function fetchAndApplyPatientIds(prefix, force = false) {
+  const existingData = getStoredCSVData(prefix);
+  if (existingData && existingData.length > 0 && !force) {
+    console.log(`✅ Patient data already loaded for ${prefix}, applying...`);
+    window.csvPatientData = existingData;
     clearPatientInputs();
     const matchResults = matchCSVToTablePatients(window.csvPatientData);
     displayMatchResults(matchResults);
-
-    setTimeout(() => window.updateDownloadCount(), 100);
-  } catch (error) {
-    console.error("CSV upload error:", error);
-    alert("Eroare la citirea fișierului CSV: " + error.message);
-  }
-}
-
-function readFileAsText(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(new Error("Failed to read file"));
-    reader.readAsText(file, "UTF-8");
-  });
-}
-
-function parseCSV(csvContent) {
-  const lines = csvContent.split("\n").filter((line) => line.trim());
-  if (lines.length < 2) {
-    throw new Error("CSV must have at least a header and one data row");
+    setTimeout(() => window.updateDownloadCount?.(), 100);
+    return;
   }
 
-  const header = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
-  console.log("CSV Header:", header);
+  console.log(`🔄 Fetching patient IDs from API for ${prefix}...`);
+  const result = await window.SyncManager.fetchGuests(prefix);
 
-  let nameColumnIndex = -1;
-  let idColumnIndex = -1;
-
-  const nameVariations = [
-    "nume și prenume",
-    "nume si prenume",
-    "nume",
-    "name",
-    "full name",
-    "patient name",
-  ];
-  const idVariations = ["id", "patient id", "cod pacient", "identifier"];
-
-  header.forEach((col, index) => {
-    const colLower = col.toLowerCase();
-    if (nameVariations.some((variation) => colLower.includes(variation))) {
-      nameColumnIndex = index;
-    }
-    if (idVariations.some((variation) => colLower.includes(variation))) {
-      idColumnIndex = index;
-    }
-  });
-
-  if (nameColumnIndex === -1 || idColumnIndex === -1) {
-    throw new Error(
-      `Required columns not found. Expected columns like "Nume și prenume" and "ID". Found: ${header.join(
-        ", ",
-      )}`,
-    );
+  if (!result?.success || !result.patients) {
+    console.warn(`❌ Failed to fetch patients for ${prefix}`);
+    return;
   }
 
-  console.log(
-    `Using column ${nameColumnIndex} for names, column ${idColumnIndex} for IDs`,
+  window.csvPatientData = result.patients;
+  await storeCSVData(prefix, result.patients);
+
+  clearPatientInputs();
+  const matchResults = matchCSVToTablePatients(window.csvPatientData);
+  displayMatchResults(matchResults);
+
+  const withId = result.patients.filter((p) => p.fullId).length;
+  const withoutId = result.patients.length - withId;
+  window.showSuccessToast?.(
+    "Pacienți încărcați",
+    `${result.patients.length} pacienți (${withId} cu ID, ${withoutId} fără ID)`,
   );
 
-  const patients = [];
-  for (let i = 1; i < lines.length; i++) {
-    const columns = parseCSVLine(lines[i]);
-    if (columns.length > Math.max(nameColumnIndex, idColumnIndex)) {
-      const name = columns[nameColumnIndex]?.trim();
-      const id = columns[idColumnIndex]?.trim();
-
-      if (name && id) {
-        patients.push({
-          name: name,
-          fullId: id,
-          originalLine: i + 1,
-        });
-      }
-    }
-  }
-
-  console.log(`Parsed ${patients.length} patients from CSV`);
-  return patients;
+  setTimeout(() => window.updateDownloadCount?.(), 100);
 }
 
-function parseCSVLine(line) {
-  const result = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === "," && !inQuotes) {
-      result.push(current.trim());
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  result.push(current.trim());
-  return result;
+// Called on session select — only fetches if data is missing
+async function ensurePatientIds(prefix) {
+  if (!prefix) return;
+  await fetchAndApplyPatientIds(prefix, false);
 }
 
 function matchCSVToTablePatients(csvPatients) {
@@ -353,16 +91,12 @@ function matchCSVToTablePatients(csvPatients) {
         const statusIcon = row.querySelector(".glyphicon");
         if (statusIcon) {
           const statusTitle = statusIcon.getAttribute("title");
-          console.log(`Row ${rowIndex} status: ${statusTitle}`);
 
           if (
             statusTitle !== "Efectuat cu rezultate" &&
             statusTitle !== "In lucru" &&
             statusTitle !== "Rezultate partiale"
           ) {
-            console.log(
-              `⏭️ Skipping patient in row ${rowIndex} - status "${statusTitle}" not allowed`,
-            );
             return;
           }
         }
@@ -379,16 +113,13 @@ function matchCSVToTablePatients(csvPatients) {
             uniqueId: tablePatientId,
             importedStatus: statusTitle,
           });
-          console.log(
-            `✅ Added patient for processing: ${name} (status: ${statusTitle})`,
-          );
         }
       }
     }
   });
 
   console.log(`Found ${tablePatients.length} patients in table`);
-  console.log(`Found ${csvPatients.length} patients in CSV`);
+  console.log(`Found ${csvPatients.length} patients in data`);
 
   const matches = [];
   const unmatched = [];
@@ -403,17 +134,11 @@ function matchCSVToTablePatients(csvPatients) {
     const tableName = normalizedName(tablePatient.name);
 
     if (processedTablePatients.has(tableName)) {
-      console.log(
-        `⏭️ SKIPPING DUPLICATE: "${tablePatient.name}" (already processed)`,
-      );
       return;
     }
 
     processedTablePatients.add(tableName);
 
-    console.log(
-      `🔍 Processing table patient: "${tablePatient.name}" → normalized: "${tableName}"`,
-    );
     let bestMatch = null;
     let bestScore = 0;
 
@@ -428,16 +153,6 @@ function matchCSVToTablePatients(csvPatients) {
         return;
       }
 
-      if (score > 0.5) {
-        console.log(
-          `  📋 CSV "${
-            csvPatient.name
-          }" → normalized: "${csvName}" → score: ${score.toFixed(3)} ${
-            isAlreadyUsed ? "(reused for exact match)" : ""
-          }`,
-        );
-      }
-
       if (score > bestScore) {
         bestScore = score;
         bestMatch = { patient: csvPatient, index: csvIndex };
@@ -445,19 +160,11 @@ function matchCSVToTablePatients(csvPatients) {
     });
 
     if (bestMatch && bestScore >= 0.666) {
-      console.log(
-        `✅ MATCH FOUND: "${tablePatient.name}" ↔ "${
-          bestMatch.patient.name
-        }" (score: ${bestScore.toFixed(3)})`,
-      );
       usedCSVPatients.add(bestMatch.index);
 
-      // Suffix is the last 2 digits (patient number)
-      const idSuffix = bestMatch.patient.fullId.slice(-2);
-
-      console.log(
-        `Table: ${tablePatient.name} → CSV: ${bestMatch.patient.name} → ID: ${bestMatch.patient.fullId} → Suffix: ${idSuffix}`,
-      );
+      // Only extract suffix if patient has a bookingId
+      const fullId = bestMatch.patient.fullId || "";
+      const idSuffix = fullId ? fullId.slice(-2) : "";
 
       matches.push({
         tablePatient: tablePatient,
@@ -468,13 +175,6 @@ function matchCSVToTablePatients(csvPatients) {
           bestScore >= 0.95 ? "exact" : bestScore >= 0.85 ? "good" : "partial",
       });
     } else {
-      console.log(
-        `❌ NO MATCH: "${tablePatient.name}" (best score: ${bestScore.toFixed(
-          3,
-        )} with "${
-          bestMatch?.patient?.name || "none"
-        }" - below threshold 0.666)`,
-      );
       unmatched.push({
         tablePatient: tablePatient,
         bestMatch: bestMatch?.patient,
@@ -489,8 +189,8 @@ function matchCSVToTablePatients(csvPatients) {
 function normalizedName(name) {
   return name
     .toLowerCase()
-    .replace(/[ăâîșț]/g, (match) => {
-      const map = { ă: "a", â: "a", î: "i", ș: "s", ț: "t" };
+    .replace(/[ăâîșțşţ]/g, (match) => {
+      const map = { ă: "a", â: "a", î: "i", ș: "s", ț: "t", ş: "s", ţ: "t" };
       return map[match] || match;
     })
     .replace(/[-_]/g, " ")
@@ -561,34 +261,17 @@ function displayMatchResults(results) {
     return;
   }
 
-  console.log("Displaying match results:", results);
-
   let autoFilled = 0;
   matches.forEach((match) => {
     const linkId = match.tablePatient.downloadLink.id;
-    console.log(
-      `Processing match for link ID: ${linkId}, table patient: ${match.tablePatient.name}`,
-    );
 
     let patientInput = null;
 
-    console.log(`🔍 Looking for input with data-link-id="${linkId}"`);
     patientInput = document.querySelector(`input[data-link-id="${linkId}"]`);
-    if (patientInput) {
-      console.log(`✓ Found input by data-link-id: ${patientInput.id}`);
-    } else {
-      console.log(`❌ No input found with data-link-id="${linkId}"`);
-    }
 
     if (!patientInput) {
       let inputId = linkId.replace("lnkView", "patient-text-");
-      console.log(`🔍 Trying link pattern replacement: ${linkId} → ${inputId}`);
       patientInput = document.getElementById(inputId);
-      if (patientInput) {
-        console.log(`✓ Found input by link pattern: ${inputId}`);
-      } else {
-        console.log(`❌ No input found with ID: ${inputId}`);
-      }
     }
 
     if (!patientInput) {
@@ -597,29 +280,15 @@ function displayMatchResults(results) {
         const numericPart = linkMatch[0];
         const inputId = `patient-text-${numericPart}`;
         patientInput = document.getElementById(inputId);
-        if (patientInput) {
-          console.log(`✓ Found input by numeric extraction: ${inputId}`);
-        }
       }
     }
 
     if (!patientInput) {
-      console.log(`🔍 Searching for text inputs in table row...`);
       const row = match.tablePatient.row;
-      if (!row) {
-        console.warn("⚠️ Row element not found for match");
-        return;
-      }
+      if (!row) return;
       const rowInputs = row.querySelectorAll('input[type="text"]');
-      console.log(
-        `Found ${rowInputs.length} text inputs in row:`,
-        Array.from(rowInputs).map((input) => input.id || "no-id"),
-      );
       if (rowInputs.length > 0) {
         patientInput = rowInputs[0];
-        console.log(`✓ Found input in same row: ${patientInput.id || "no-id"}`);
-      } else {
-        console.log(`❌ No text inputs found in row`);
       }
     }
 
@@ -631,11 +300,6 @@ function displayMatchResults(results) {
           const parentInputs = parent.querySelectorAll('input[type="text"]');
           if (parentInputs.length > 0) {
             patientInput = parentInputs[0];
-            console.log(
-              `✓ Found input in parent level ${i + 1}: ${
-                patientInput.id || "no-id"
-              }`,
-            );
             break;
           }
           parent = parent.parentElement;
@@ -643,31 +307,21 @@ function displayMatchResults(results) {
       }
     }
 
-    console.log(
-      `Final result for ${
-        match.tablePatient.name
-      }: input found = ${!!patientInput}`,
-    );
-
     if (patientInput) {
+      // Fill with suffix if available, leave empty if no bookingId
       patientInput.value = match.idSuffix;
-      patientInput.style.backgroundColor =
-        match.matchQuality === "exact"
-          ? "#d4edda"
-          : match.matchQuality === "good"
-            ? "#fff3cd"
-            : "#f8d7da";
+      if (match.idSuffix) {
+        patientInput.style.backgroundColor =
+          match.matchQuality === "exact"
+            ? "#d4edda"
+            : match.matchQuality === "good"
+              ? "#fff3cd"
+              : "#f8d7da";
+      } else {
+        // Matched by name but no bookingId yet
+        patientInput.style.backgroundColor = "#e2e3e5";
+      }
       autoFilled++;
-      const matchTypeLog =
-        match.matchQuality === "exact"
-          ? "✅ EXACT MATCH"
-          : match.matchQuality === "good"
-            ? "🔶 GOOD MATCH (partial)"
-            : "⚠️ FAIR MATCH (partial)";
-
-      console.log(
-        `${matchTypeLog}: Table "${match.tablePatient.name}" ↔ CSV "${match.csvPatient.name}" (ID: ${match.csvPatient.fullId}) → filled ${match.idSuffix}`,
-      );
 
       const nameCell = match.tablePatient.row.cells[1];
       if (nameCell && !nameCell.querySelector(".csv-match")) {
@@ -681,34 +335,20 @@ function displayMatchResults(results) {
         `;
         const csvInfo =
           match.matchQuality === "exact"
-            ? `(CSV: ${match.csvPatient.name})`
-            : `(CSV: ${match.csvPatient.name} | ID: ${match.csvPatient.fullId})`;
+            ? `(${match.csvPatient.name})`
+            : `(${match.csvPatient.name} | ${match.csvPatient.fullId || "fără ID"})`;
         matchIndicator.textContent = csvInfo;
         nameCell.appendChild(matchIndicator);
       }
     } else {
       console.error(`❌ Input not found for link: ${linkId}`);
-      const allInputs = document.querySelectorAll('input[id*="patient-text-"]');
-      console.log(
-        `Available patient inputs:`,
-        Array.from(allInputs).map((inp) => inp.id),
-      );
     }
   });
 
   resultsDiv.style.display = "none";
 
-  setTimeout(() => {
-    const stillThere = document.getElementById("match-results");
-    if (!stillThere) {
-      console.error("⚠️ Match results div disappeared after timeout!");
-    } else {
-      console.log("✅ Match results div still present after timeout");
-    }
-  }, 2000);
-
   console.log(
-    `✅ CSV matching complete: ${matches.length} matched, ${unmatched.length} require manual attention`,
+    `✅ Matching complete: ${matches.length} matched, ${unmatched.length} require manual attention`,
   );
 }
 
@@ -716,38 +356,24 @@ function findBatchButtonForInput(input) {
   const container = input.parentElement;
   if (container) {
     const button = container.querySelector("button");
-    if (button) {
-      console.log(`Found batch button for input ${input.id}`);
-      return button;
-    }
+    if (button) return button;
   }
 
   const cell = input.closest("td");
   if (cell) {
     const button = cell.querySelector("button");
-    if (button) {
-      console.log(`Found batch button in same cell for input ${input.id}`);
-      return button;
-    }
+    if (button) return button;
   }
 
-  console.error(`❌ Batch button not found for input ${input.id}`);
   return null;
 }
 
-// Export to window (csvPatientData is already on window from line 4)
+// Export to window
 window.storeCSVData = storeCSVData;
 window.getStoredCSVData = getStoredCSVData;
-window.clearStoredCSVData = clearStoredCSVData;
-window.tryLoadAnyStoredData = tryLoadAnyStoredData;
 window.clearPatientInputs = clearPatientInputs;
-window.checkForStoredCSVData = checkForStoredCSVData;
-window.updateCSVButton = updateCSVButton;
-window.autoDetectIdPrefix = autoDetectIdPrefix;
-window.handleCSVUpload = handleCSVUpload;
-window.readFileAsText = readFileAsText;
-window.parseCSV = parseCSV;
-window.parseCSVLine = parseCSVLine;
+window.fetchAndApplyPatientIds = fetchAndApplyPatientIds;
+window.ensurePatientIds = ensurePatientIds;
 window.matchCSVToTablePatients = matchCSVToTablePatients;
 window.normalizedName = normalizedName;
 window.calculateNameSimilarity = calculateNameSimilarity;

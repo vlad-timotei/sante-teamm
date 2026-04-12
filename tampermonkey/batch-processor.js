@@ -26,11 +26,18 @@ async function toggleBatch(element, index, batchBtn) {
 
 async function addToBatch(element, index, batchBtn) {
   const patientTextInput = document.getElementById(`patient-text-${index}`);
-  const patientText = patientTextInput ? patientTextInput.value.trim() : "";
+  let patientText = patientTextInput ? patientTextInput.value.trim() : "";
 
   if (!patientText) {
-    alert("Introduceți un sufix de ID pentru acest pacient înainte de a-l adăuga.");
+    alert("Introduceți un ID pentru acest pacient înainte de a-l adăuga.");
     return;
+  }
+
+  // If user entered full ID (e.g. "26S128"), extract just the suffix
+  const idPrefix = document.getElementById("id-prefix")?.value.trim();
+  if (idPrefix && patientText.toUpperCase().startsWith(idPrefix.toUpperCase())) {
+    patientText = patientText.slice(idPrefix.length);
+    if (patientTextInput) patientTextInput.value = patientText;
   }
 
   const row = element.closest("tr");
@@ -76,7 +83,7 @@ async function addToBatch(element, index, batchBtn) {
   }
 
   const patientData = {
-    nume: cells[1]?.textContent.trim().replace(/\s*\(CSV:.*$/, "").trim(),
+    nume: cells[1]?.textContent.trim().replace(/\s*\(.*$/, "").trim(),
     cnp: cells[2]?.textContent.trim(),
     dataNasterii: cells[3]?.textContent.trim(),
     patientText: patientText,

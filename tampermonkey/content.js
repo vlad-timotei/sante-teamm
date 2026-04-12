@@ -1,5 +1,5 @@
-// Content v2.1.0
-// Main initialization — DB-only sync, no localStorage timeouts
+// Content v2.2.0
+// Main initialization — DB-only sync, API-based patient IDs
 
 // Format "25S7" → "2025 - S7", "25S19" → "2025 - S19"
 function formatSessionLabel(prefix) {
@@ -50,48 +50,79 @@ async function initializeBatchExtension() {
     const allSeries = await window.SyncManager.fetchAllSeries();
     const currentPrefix = await window.SyncManager.fetchCurrentSeries();
 
-    // "New session" option — always last
-    const newOpt = document.createElement("option");
-    newOpt.value = "__new__";
-    newOpt.textContent = "+ Sejur nou";
-    idPrefixSelect.appendChild(newOpt);
-
     allSeries.forEach((s) => {
       const opt = document.createElement("option");
       opt.value = s.prefix;
       opt.textContent = window.formatSessionLabel(s.prefix);
       if (s.prefix === currentPrefix) opt.selected = true;
-      idPrefixSelect.insertBefore(opt, newOpt);
+      idPrefixSelect.appendChild(opt);
     });
 
     const prefix = idPrefixSelect.value;
 
     // Load state from server and set up UI
-    if (prefix && prefix !== "__new__") {
+    if (prefix) {
       await window.SyncManager.loadState(prefix);
       await window.SyncManager.setCurrentSeries(prefix);
       await window.migratePatientData();
       await window.syncUIWithLocalStorage();
-      window.checkForStoredCSVData?.();
+      await window.ensurePatientIds(prefix);
     }
 
     // Session change: load fresh state from server
     idPrefixSelect.addEventListener("change", async () => {
       const p = idPrefixSelect.value;
-      if (p === "__new__") {
-        // Open CSV file picker, then revert selection
-        const previousPrefix = window.SyncManager.getCachedState()?.prefix || "";
-        idPrefixSelect.value = previousPrefix;
-        const csvInput = document.getElementById("csv-upload");
-        if (csvInput) csvInput.click();
-        return;
-      }
       if (!p) return;
       await window.SyncManager.loadState(p);
       await window.SyncManager.setCurrentSeries(p);
       await window.syncUIWithLocalStorage();
-      window.checkForStoredCSVData?.();
+      await window.ensurePatientIds(p);
     });
+  }
+
+  // Wire up bottom buttons
+  const syncBtn = document.getElementById("sante-sync-sessions");
+  if (syncBtn) {
+    syncBtn.onclick = async () => {
+      syncBtn.disabled = true;
+      syncBtn.textContent = "⏳ Se sincronizează...";
+      const year = new Date().getFullYear();
+      const result = await window.SyncManager.syncSessions(year);
+      if (result?.success) {
+        // Refresh dropdown
+        const freshSeries = await window.SyncManager.fetchAllSeries();
+        const select = document.getElementById("id-prefix");
+        const currentVal = select.value;
+        // Remove all options except the first placeholder
+        while (select.options.length > 1) select.remove(1);
+        freshSeries.forEach((s) => {
+          const opt = document.createElement("option");
+          opt.value = s.prefix;
+          opt.textContent = window.formatSessionLabel(s.prefix);
+          if (s.prefix === currentVal) opt.selected = true;
+          select.appendChild(opt);
+        });
+        window.showSuccessToast("Sesiuni sincronizate", `${result.created} noi, ${result.skipped} existente`);
+      }
+      syncBtn.disabled = false;
+      syncBtn.textContent = "🔄 Sincronizează Sesiuni";
+    };
+  }
+
+  const updateIdsBtn = document.getElementById("sante-update-ids");
+  if (updateIdsBtn) {
+    updateIdsBtn.onclick = async () => {
+      const currentPrefix = document.getElementById("id-prefix")?.value;
+      if (!currentPrefix) {
+        alert("Selectați mai întâi o sesiune.");
+        return;
+      }
+      updateIdsBtn.disabled = true;
+      updateIdsBtn.textContent = "⏳ Se actualizează...";
+      await window.fetchAndApplyPatientIds(currentPrefix, true);
+      updateIdsBtn.disabled = false;
+      updateIdsBtn.textContent = "🔄 Actualizează ID-uri";
+    };
   }
 }
 

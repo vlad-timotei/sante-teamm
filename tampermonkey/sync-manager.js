@@ -1,4 +1,4 @@
-// Sync Manager v2.2.0
+// Sync Manager v2.3.0
 // DB-only: all state lives on the server, in-memory cache per session
 
 (function () {
@@ -302,6 +302,32 @@
   }
 
   // ----------------------------------------------------------------
+  // Teamm API proxy calls
+  // ----------------------------------------------------------------
+
+  async function syncSessions(year) {
+    setSyncStatus('syncing', `Se sincronizează sesiunile ${year}...`);
+    const result = await apiCall('POST', 'sync_sessions', { year });
+    if (result?.success) {
+      setSyncStatus('ok', `${result.created} sesiuni noi, ${result.skipped} existente`);
+    } else {
+      setSyncStatus('error', 'Sincronizare sesiuni eșuată');
+    }
+    return result;
+  }
+
+  async function fetchGuests(prefix) {
+    setSyncStatus('syncing', `Se încarcă pacienții ${prefix}...`);
+    const result = await apiCall('GET', `fetch_guests&prefix=${encodeURIComponent(prefix)}`);
+    if (result?.success) {
+      setSyncStatus('ok', `${result.total} pacienți încărcați`);
+    } else {
+      setSyncStatus('error', 'Încărcare pacienți eșuată');
+    }
+    return result;
+  }
+
+  // ----------------------------------------------------------------
   // Init
   // ----------------------------------------------------------------
 
@@ -327,6 +353,8 @@
     clearCurrentSeries,
     fetchCurrentSeries,
     fetchAllSeries,
+    syncSessions,
+    fetchGuests,
     resetCredentials,
     getDeviceId,
     getDeviceName,

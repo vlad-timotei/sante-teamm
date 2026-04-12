@@ -388,7 +388,6 @@ function createSingleProcessButton() {
       ">
         <option value="">-- Sesiune --</option>
       </select>
-      <input type="file" id="csv-upload" accept=".csv" style="display: none;">
       <button type="button" id="sante-analyze-page" style="
         background: #6c757d;
         color: white;
@@ -435,13 +434,42 @@ function createSingleProcessButton() {
   if (exportBtn) exportBtn.onclick = window.exportData;
   if (analyzeBtn) analyzeBtn.onclick = window.analyzeCurrentPage;
 
-  const csvFileInput = document.getElementById("csv-upload");
-  csvFileInput.onchange = function (event) {
-    if (this.files && this.files[0]) {
-      console.log("CSV file selected, auto-processing...");
-      window.handleCSVUpload(event);
-    }
-  };
+  // Bottom buttons: Sync Sessions + Update IDs
+  const bottomContainer = document.createElement("div");
+  bottomContainer.style.cssText = "margin: 12px 0; padding: 0 12px; text-align: center;";
+  bottomContainer.innerHTML = `
+    <div style="display: flex; gap: 12px; justify-content: center;">
+      <button type="button" id="sante-sync-sessions" style="
+        background: #6c757d;
+        color: white;
+        border: 2px solid #6c757d;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: bold;
+        opacity: 0.6;
+        transition: all 0.2s;
+      ">
+        🔄 Sincronizează Sesiuni
+      </button>
+      <button type="button" id="sante-update-ids" style="
+        background: #6c757d;
+        color: white;
+        border: 2px solid #6c757d;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: bold;
+        opacity: 0.6;
+        transition: all 0.2s;
+      ">
+        🔄 Actualizează ID-uri
+      </button>
+    </div>
+  `;
+  table.parentNode.insertBefore(bottomContainer, table.nextSibling);
 }
 
 function displayTestResults(testResultCell, extractedData, patientKey = null) {

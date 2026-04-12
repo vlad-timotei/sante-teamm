@@ -1,5 +1,5 @@
 <?php
-// Sante Sync API v1.2.0
+// Sante Sync API v1.3.0
 
 require_once __DIR__ . '/config.php';
 
@@ -51,23 +51,25 @@ $pdo->exec("
 
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS series_state (
-        prefix         VARCHAR(30)  NOT NULL PRIMARY KEY,
-        csv_data       LONGTEXT,
-        csv_updated_at BIGINT,
-        export_queue   LONGTEXT,
-        updated_at     DATETIME     NOT NULL,
-        updated_by     VARCHAR(64),
-        device_name    VARCHAR(100),
-        is_current     TINYINT(1)   NOT NULL DEFAULT 0
+        prefix            VARCHAR(30)  NOT NULL PRIMARY KEY,
+        teamm_session_id  VARCHAR(30),
+        csv_data          LONGTEXT,
+        csv_updated_at    BIGINT,
+        export_queue      LONGTEXT,
+        updated_at        DATETIME     NOT NULL,
+        updated_by        VARCHAR(64),
+        device_name       VARCHAR(100),
+        is_current        TINYINT(1)   NOT NULL DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Add is_current column if upgrading from older schema
+// Add columns if upgrading from older schema
 try {
     $pdo->exec("ALTER TABLE series_state ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 0");
-} catch (PDOException $e) {
-    // Column already exists, ignore
-}
+} catch (PDOException $e) { /* already exists */ }
+try {
+    $pdo->exec("ALTER TABLE series_state ADD COLUMN teamm_session_id VARCHAR(30) AFTER prefix");
+} catch (PDOException $e) { /* already exists */ }
 
 
 // --- Verify credentials ---
@@ -181,6 +183,143 @@ switch ($action) {
             echo json_encode(['success' => true, 'series' => $rows]);
         }
         break;
+
+    // ================================================================
+    // POST ?action=sync_sessions       -> fetch sessions from Teamm API
+    //   Body: { "year": 2026 }           and create missing DB entries
+    // ================================================================
+    case 'sync_sessions':
+        if ($method !== 'POST') { http_response_code(405); echo json_encode(['error' => 'POST required']); exit; }
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $year = (int)($body['year'] ?? date('Y'));
+        $yy   = substr((string)$year, -2);
+
+        $startDate = urlencode("{$year}-01-01T00:00:00.000Z");
+        $endDate   = urlencode("{$year}-12-31T23:59:59.999Z");
+        $url = TEAMM_API_BASE . "/sessions?startDate={$startDate}&endDate={$endDate}&start=1&length=50";
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_HTTPHEADER     => [
+                'X-API-APP-ID: '     . TEAMM_APP_ID,
+                'X-API-SECRET-KEY: ' . TEAMM_SECRET_KEY,
+                'X-API-PUBLIC-KEY: ' . TEAMM_PUBLIC_KEY,
+            ],
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200 || !$response) {
+            http_response_code(502);
+            echo json_encode(['error' => 'Teamm API request failed', 'httpCode' => $httpCode]);
+            exit;
+        }
+
+        $teammData = json_decode($response, true);
+        $sessions  = $teammData['data'] ?? [];
+        $created   = 0;
+        $skipped   = 0;
+
+        foreach ($sessions as $session) {
+            $prefix   = $yy . $session['name'];    // e.g. "26S1"
+            $teammId  = $session['_id'];
+
+            // Check if prefix already exists
+            $check = $pdo->prepare('SELECT prefix FROM series_state WHERE prefix = ?');
+            $check->execute([$prefix]);
+            if ($check->fetch()) {
+                // Update teamm_session_id if missing
+                $pdo->prepare('UPDATE series_state SET teamm_session_id = ? WHERE prefix = ? AND teamm_session_id IS NULL')
+                     ->execute([$teammId, $prefix]);
+                $skipped++;
+                continue;
+            }
+
+            $stmt = $pdo->prepare('
+                INSERT INTO series_state (prefix, teamm_session_id, updated_at, updated_by, device_name)
+                VALUES (?, ?, NOW(), ?, ?)
+            ');
+            $stmt->execute([$prefix, $teammId, $deviceId, $deviceName]);
+            $created++;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'total'   => count($sessions),
+            'created' => $created,
+            'skipped' => $skipped,
+        ]);
+        break;
+
+
+    // ================================================================
+    // GET ?action=fetch_guests&prefix=26S1  -> fetch patient IDs from
+    //   Teamm API for the session matching this prefix
+    // ================================================================
+    case 'fetch_guests':
+        if ($method !== 'GET') { http_response_code(405); echo json_encode(['error' => 'GET required']); exit; }
+
+        $prefix = trim($_GET['prefix'] ?? '');
+        if (!$prefix) { http_response_code(400); echo json_encode(['error' => 'Missing prefix']); exit; }
+
+        // Look up teamm_session_id
+        $stmt = $pdo->prepare('SELECT teamm_session_id FROM series_state WHERE prefix = ?');
+        $stmt->execute([$prefix]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row || !$row['teamm_session_id']) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Session not found or missing Teamm ID']);
+            exit;
+        }
+
+        $sessionId = $row['teamm_session_id'];
+        $url = TEAMM_API_BASE . "/guests?sessionId={$sessionId}&role=patient&project=" . urlencode('firstName,lastName,startDate,bookingId');
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_HTTPHEADER     => [
+                'X-API-APP-ID: '     . TEAMM_APP_ID,
+                'X-API-SECRET-KEY: ' . TEAMM_SECRET_KEY,
+                'X-API-PUBLIC-KEY: ' . TEAMM_PUBLIC_KEY,
+            ],
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200 || !$response) {
+            http_response_code(502);
+            echo json_encode(['error' => 'Teamm API request failed', 'httpCode' => $httpCode]);
+            exit;
+        }
+
+        $teammData = json_decode($response, true);
+        $guests    = $teammData['data'] ?? [];
+
+        // Convert to csv_data format: [{name, fullId}]
+        $csvData = [];
+        foreach ($guests as $guest) {
+            $name = trim(($guest['lastName'] ?? '') . ' ' . ($guest['firstName'] ?? ''));
+            $csvData[] = [
+                'name'   => $name,
+                'fullId' => $guest['bookingId'] ?? '',
+            ];
+        }
+
+        echo json_encode([
+            'success'  => true,
+            'patients' => $csvData,
+            'total'    => count($csvData),
+        ]);
+        break;
+
 
     default:
         http_response_code(404);
