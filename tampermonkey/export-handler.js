@@ -271,16 +271,18 @@ async function updateExportCount() {
   if (exportButton) {
     if (exportCount > 0) {
       exportButton.disabled = false;
-      exportButton.style.background = "#007cba";
-      exportButton.style.borderColor = "#007cba";
+      exportButton.style.background = "linear-gradient(135deg, #17a2b8, #1289a0)";
+      exportButton.style.border = "none";
       exportButton.style.cursor = "pointer";
       exportButton.style.opacity = "1";
+      exportButton.style.boxShadow = "0 2px 8px rgba(23, 162, 184, 0.4)";
     } else {
       exportButton.disabled = true;
-      exportButton.style.background = "#6c757d";
-      exportButton.style.borderColor = "#6c757d";
+      exportButton.style.background = "linear-gradient(135deg, #17a2b8, #1289a0)";
+      exportButton.style.border = "none";
       exportButton.style.cursor = "not-allowed";
-      exportButton.style.opacity = "0.6";
+      exportButton.style.opacity = "0.5";
+      exportButton.style.boxShadow = "0 2px 8px rgba(23, 162, 184, 0.2)";
     }
   }
 }
@@ -293,11 +295,11 @@ async function updateDownloadCount() {
     if (countElement) countElement.textContent = 0;
     if (analyzeButton) {
       analyzeButton.disabled = true;
-      analyzeButton.style.background = "#6c757d";
-      analyzeButton.style.borderColor = "#6c757d";
+      analyzeButton.style.background = "linear-gradient(135deg, #e8913a, #d4802e)";
+      analyzeButton.style.border = "none";
       analyzeButton.style.color = "white";
       analyzeButton.style.cursor = "not-allowed";
-      analyzeButton.style.opacity = "0.6";
+      analyzeButton.style.opacity = "0.5";
     }
     return;
   }
@@ -340,18 +342,19 @@ async function updateDownloadCount() {
   if (analyzeButton) {
     if (analyzeCount > 0) {
       analyzeButton.disabled = false;
-      analyzeButton.style.background = "#ffc107";
-      analyzeButton.style.borderColor = "#ffc107";
-      analyzeButton.style.color = "#212529";
+      analyzeButton.style.background = "linear-gradient(135deg, #e8913a, #d4802e)";
+      analyzeButton.style.border = "none";
+      analyzeButton.style.color = "white";
       analyzeButton.style.cursor = "pointer";
       analyzeButton.style.opacity = "1";
+      analyzeButton.style.boxShadow = "0 2px 8px rgba(232, 145, 58, 0.4)";
     } else {
       analyzeButton.disabled = true;
-      analyzeButton.style.background = "#6c757d";
-      analyzeButton.style.borderColor = "#6c757d";
+      analyzeButton.style.background = "linear-gradient(135deg, #e8913a, #d4802e)";
+      analyzeButton.style.border = "none";
       analyzeButton.style.color = "white";
       analyzeButton.style.cursor = "not-allowed";
-      analyzeButton.style.opacity = "0.6";
+      analyzeButton.style.opacity = "0.5";
     }
   }
 }

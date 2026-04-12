@@ -610,8 +610,9 @@ async function analyzeCurrentPage() {
   if (analyzeButton) {
     analyzeButton.disabled = true;
     analyzeButton.innerHTML = `🔄 Se analizează... (0/${patientsWithIDs.length})`;
-    analyzeButton.style.background = "#007cba";
+    analyzeButton.style.background = "linear-gradient(135deg, #e8913a, #d4802e)";
     analyzeButton.style.cursor = "not-allowed";
+    analyzeButton.style.opacity = "0.7";
   }
 
   if (exportButton) {

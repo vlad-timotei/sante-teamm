@@ -53,6 +53,7 @@ async function initializeBatchExtension() {
 
   // Auto-sync sessions from Teamm API, then populate dropdown
   if (idPrefixSelect) {
+    idPrefixSelect.disabled = true;
     await window.SyncManager.syncSessions();
     const allSeries = await window.SyncManager.fetchAllSeries();
     const currentPrefix = await window.SyncManager.fetchCurrentSeries();
@@ -67,23 +68,29 @@ async function initializeBatchExtension() {
 
     const prefix = idPrefixSelect.value;
 
+    idPrefixSelect.disabled = false;
+
     // Load state from server and set up UI
     if (prefix) {
+      idPrefixSelect.disabled = true;
       await window.SyncManager.loadState(prefix);
       await window.SyncManager.setCurrentSeries(prefix);
       await window.migratePatientData();
       await window.syncUIWithLocalStorage();
       await window.fetchAndApplyPatientIds(prefix);
+      idPrefixSelect.disabled = false;
     }
 
     // Session change: load fresh state from server
     idPrefixSelect.addEventListener("change", async () => {
       const p = idPrefixSelect.value;
       if (!p) return;
+      idPrefixSelect.disabled = true;
       await window.SyncManager.loadState(p);
       await window.SyncManager.setCurrentSeries(p);
       await window.syncUIWithLocalStorage();
       await window.fetchAndApplyPatientIds(p);
+      idPrefixSelect.disabled = false;
     });
   }
 

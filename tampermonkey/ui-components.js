@@ -444,38 +444,42 @@ function createSingleProcessButton() {
   buttonContainer.innerHTML = `
     <div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
       <button type="button" id="sante-analyze-page" style="
-        background: #6c757d;
+        background: linear-gradient(135deg, #e8913a, #d4802e);
         color: white;
-        border: 2px solid #6c757d;
-        padding: 6px 12px;
-        border-radius: 4px;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 20px;
         cursor: not-allowed;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: bold;
-        opacity: 0.6;
+        opacity: 0.5;
         display: inline-block;
         text-align: center;
-        transition: all 0.2s;
+        transition: all 0.3s;
         margin-bottom: 8px;
+        box-shadow: 0 2px 8px rgba(232, 145, 58, 0.3);
+        letter-spacing: 0.3px;
       " disabled>
         🔍 Analizează (<span id="analyze-count">0</span>)
       </button>
       <button type="button" id="sante-process-export" style="
-        background: #6c757d;
+        background: linear-gradient(135deg, #17a2b8, #1289a0);
         color: white;
-        border: 2px solid #6c757d;
-        padding: 6px 12px;
-        border-radius: 4px;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 20px;
         cursor: not-allowed;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: bold;
-        opacity: 0.6;
+        opacity: 0.5;
         display: inline-block;
         text-align: center;
-        transition: all 0.2s;
+        transition: all 0.3s;
         margin-bottom: 8px;
+        box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+        letter-spacing: 0.3px;
       " disabled>
-        📥 Import Teamm (<span id="exported-count">0</span>)
+        📥 Importă în Teamm (<span id="exported-count">0</span>)
       </button>
     </div>
     <div id="analysis-progress" style="display: none; margin-top: 8px; text-align: center; font-size: 12px; color: #007cba; font-weight: bold;">
