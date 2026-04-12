@@ -1,16 +1,34 @@
 <?php
-// Sante Sync API v1.3.0
+// Sante Sync API v1.4.0
 
 require_once __DIR__ . '/config.php';
 
-// --- CORS headers ---
+// --- CORS headers (restricted to Sante portal) ---
+$allowedOrigins = [
+    'https://rezultateptmedici.clinica-sante.ro',
+    'https://teamm.work',
+];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: $origin");
+} else {
+    header('Access-Control-Allow-Origin: https://rezultateptmedici.clinica-sante.ro');
+}
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Device-Id, X-Device-Name');
+header('Vary: Origin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
+    exit;
+}
+
+// --- Payload size limit (1 MB) ---
+$rawInput = file_get_contents('php://input');
+if (strlen($rawInput) > 1048576) {
+    http_response_code(413);
+    echo json_encode(['error' => 'Payload too large']);
     exit;
 }
 
@@ -39,28 +57,33 @@ try {
     exit;
 }
 
-// --- Create tables on first run ---
-$pdo->exec("
-    CREATE TABLE IF NOT EXISTS users (
-        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-        username     VARCHAR(60)  NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-");
+// --- Rate limiting on failed auth (5 attempts per 15 min per IP) ---
+$clientIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
-$pdo->exec("
-    CREATE TABLE IF NOT EXISTS series_state (
-        prefix            VARCHAR(30)  NOT NULL PRIMARY KEY,
-        teamm_session_id  VARCHAR(30),
-        export_queue      LONGTEXT,
-        updated_at        DATETIME     NOT NULL,
-        updated_by        VARCHAR(64),
-        device_name       VARCHAR(100),
-        is_current        TINYINT(1)   NOT NULL DEFAULT 0
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-");
+// Ensure auth_attempts table exists (lightweight check)
+$tableCheck = $pdo->query("SHOW TABLES LIKE 'auth_attempts'")->rowCount();
+if ($tableCheck === 0) {
+    $pdo->exec("
+        CREATE TABLE auth_attempts (
+            ip          VARCHAR(45)  NOT NULL,
+            attempted_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ip_time (ip, attempted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
 
+// Clean old attempts
+$pdo->exec("DELETE FROM auth_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+
+$stmt = $pdo->prepare('SELECT COUNT(*) FROM auth_attempts WHERE ip = ?');
+$stmt->execute([$clientIp]);
+$failCount = (int)$stmt->fetchColumn();
+
+if ($failCount >= 5) {
+    http_response_code(429);
+    echo json_encode(['error' => 'Too many failed attempts. Try again later.']);
+    exit;
+}
 
 // --- Verify credentials ---
 $stmt = $pdo->prepare('SELECT password_hash FROM users WHERE username = ?');
@@ -68,6 +91,8 @@ $stmt->execute([trim($username)]);
 $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$userRow || !password_verify($password, $userRow['password_hash'])) {
+    // Record failed attempt
+    $pdo->prepare('INSERT INTO auth_attempts (ip) VALUES (?)')->execute([$clientIp]);
     http_response_code(401);
     echo json_encode(['error' => 'Invalid username or password']);
     exit;
@@ -88,7 +113,7 @@ switch ($action) {
     // ================================================================
     case 'state':
         if ($method === 'GET') {
-            $prefix = trim($_GET['prefix'] ?? '');
+            $prefix = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['prefix'] ?? ''), 0, 30);
             if (!$prefix) {
                 echo json_encode(['success' => true, 'export_queue' => []]);
                 exit;
@@ -108,7 +133,7 @@ switch ($action) {
             }
 
         } elseif ($method === 'POST') {
-            $body = json_decode(file_get_contents('php://input'), true);
+            $body = json_decode($rawInput, true);
             if (!$body) { http_response_code(400); echo json_encode(['error' => 'Invalid JSON']); exit; }
 
             $prefix       = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['prefix'] ?? ''), 0, 30);
@@ -142,7 +167,7 @@ switch ($action) {
             echo json_encode(['success' => true, 'current' => $row ?: null]);
 
         } elseif ($method === 'POST') {
-            $body   = json_decode(file_get_contents('php://input'), true);
+            $body   = json_decode($rawInput, true);
             $prefix = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['prefix'] ?? ''), 0, 30);
 
             // Clear current flag on all series
@@ -246,7 +271,7 @@ switch ($action) {
     case 'fetch_guests':
         if ($method !== 'GET') { http_response_code(405); echo json_encode(['error' => 'GET required']); exit; }
 
-        $prefix = trim($_GET['prefix'] ?? '');
+        $prefix = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['prefix'] ?? ''), 0, 30);
         if (!$prefix) { http_response_code(400); echo json_encode(['error' => 'Missing prefix']); exit; }
 
         // Look up teamm_session_id
