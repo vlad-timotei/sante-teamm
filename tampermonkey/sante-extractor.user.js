@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sante PDF Batch Extractor
 // @namespace    https://github.com/vlad-timotei/sante-teamm
-// @version      1.9.82
+// @version      1.9.83
 // @description  Batch extract data from PDFs on rezultateptmedici.clinica-sante.ro
 // @author       Vlad T
 // @match        *://rezultateptmedici.clinica-sante.ro/*

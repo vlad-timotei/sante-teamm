@@ -177,8 +177,9 @@ async function taAdminSave() {
     taClearForm();
     taLoadTests();
     await window.refreshTestDefinitions();
+    taToast("✅ Test salvat");
   } else {
-    alert("Eroare la salvare.");
+    taToast("❌ Eroare la salvare", true);
   }
 }
 
@@ -202,8 +203,9 @@ async function taAdminDelete(key) {
   if (result?.success) {
     taLoadTests();
     await window.refreshTestDefinitions();
+    taToast("🗑️ Test șters");
   } else {
-    alert("Eroare la ștergere.");
+    taToast("❌ Eroare la ștergere", true);
   }
 }
 
@@ -214,6 +216,23 @@ function taClearForm() {
   document.getElementById("ta-raw-regex").checked = false;
   document.getElementById("ta-form-title").textContent = "Adaugă test nou";
   document.getElementById("ta-save-btn").textContent = "Salvează";
+}
+
+function taToast(msg, isError = false) {
+  const existing = document.getElementById("ta-toast");
+  if (existing) existing.remove();
+  const el = document.createElement("div");
+  el.id = "ta-toast";
+  el.textContent = msg;
+  el.style.cssText = `
+    position: fixed; bottom: 60px; right: 20px; padding: 10px 20px;
+    border-radius: 8px; color: white; font-size: 13px; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 100001;
+    background: ${isError ? '#dc3545' : '#28a745'};
+    transition: opacity 0.3s;
+  `;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2500);
 }
 
 function escHtml(s) {
