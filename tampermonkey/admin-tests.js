@@ -32,7 +32,7 @@ function openTestAdmin() {
            style="color: rgba(255,255,255,0.85); text-decoration: none; font-size: 12px; margin-right: 16px;">
           📋 Date medicale Teamm ↗
         </a>
-        <button onclick="window.closeTestAdmin()" style="
+        <button data-action="close" style="
           background: none; border: none; color: white; font-size: 20px;
           cursor: pointer; padding: 0 4px; line-height: 1;
         ">✕</button>
@@ -61,7 +61,7 @@ function openTestAdmin() {
             <input type="number" id="ta-order" value="0" style="width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
           </div>
           <div style="flex: 0 0 auto;">
-            <button onclick="window.taAdminSave()" id="ta-save-btn" style="
+            <button data-action="save" id="ta-save-btn" style="
               padding: 7px 18px; border: none; border-radius: 16px; font-size: 12px;
               font-weight: 600; cursor: pointer; background: linear-gradient(135deg, #17a2b8, #1289a0);
               color: white;
@@ -87,6 +87,17 @@ function openTestAdmin() {
       </div>
     </div>
   `;
+
+  // Event delegation for buttons inside the modal
+  modal.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === "save") taAdminSave();
+    else if (action === "close") closeTestAdmin();
+    else if (action === "edit") taAdminEdit(JSON.parse(btn.dataset.test));
+    else if (action === "delete") taAdminDelete(btn.dataset.key);
+  });
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -121,18 +132,18 @@ async function taLoadTests() {
     </tr></thead><tbody>`;
 
   tests.forEach((t) => {
-    const safeT = JSON.stringify(t).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    const safeT = escHtml(JSON.stringify(t));
     html += `<tr style="border-bottom: 1px solid #eee;">
       <td style="padding: 6px 10px;">${t.sort_order}</td>
       <td style="padding: 6px 10px; font-weight: bold;">${escHtml(t.key)}</td>
       <td style="padding: 6px 10px;">${escHtml(t.name)}</td>
       <td style="padding: 6px 10px; font-family: monospace; font-size: 11px; color: #666; word-break: break-all;">${escHtml(t.pattern)}</td>
       <td style="padding: 6px 10px; white-space: nowrap;">
-        <button onclick='window.taAdminEdit(${safeT})' style="
+        <button data-action="edit" data-test="${safeT}" style="
           padding: 3px 10px; border: none; border-radius: 12px; font-size: 11px;
           cursor: pointer; background: #17a2b8; color: white; margin-right: 4px;
         ">✏️</button>
-        <button onclick='window.taAdminDelete("${escHtml(t.key)}")' style="
+        <button data-action="delete" data-key="${escHtml(t.key)}" style="
           padding: 3px 10px; border: none; border-radius: 12px; font-size: 11px;
           cursor: pointer; background: #dc3545; color: white;
         ">🗑️</button>
@@ -223,6 +234,3 @@ function escHtml(s) {
 // Export
 window.openTestAdmin = openTestAdmin;
 window.closeTestAdmin = closeTestAdmin;
-window.taAdminSave = taAdminSave;
-window.taAdminEdit = taAdminEdit;
-window.taAdminDelete = taAdminDelete;
