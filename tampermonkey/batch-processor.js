@@ -77,7 +77,7 @@ async function addToBatch(element, index, batchBtn) {
   }
 
   if (!idPrefix) {
-    alert("Selectați o sesiune înainte de procesare.");
+    alert("Selectați un sejur înainte de procesare.");
     return;
   }
 

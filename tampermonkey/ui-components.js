@@ -158,7 +158,7 @@ function makeFiltersCollapsible() {
     `;
     const defaultOpt = document.createElement("option");
     defaultOpt.value = "";
-    defaultOpt.textContent = "-- Sesiune --";
+    defaultOpt.textContent = "-- Sejur --";
     sessionSelect.appendChild(defaultOpt);
 
     controlsRow.appendChild(toggleButton);

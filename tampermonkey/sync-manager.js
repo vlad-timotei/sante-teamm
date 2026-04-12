@@ -301,15 +301,15 @@
   // ----------------------------------------------------------------
 
   async function syncSessions() {
-    setSyncStatus('syncing', 'Se sincronizează sesiunile...');
+    setSyncStatus('syncing', 'Se sincronizează sejururile...');
     const result = await apiCall('POST', 'sync_sessions');
     if (result?.success) {
       const msg = result.created > 0
-        ? `${result.created} sesiuni noi, ${result.skipped} existente`
-        : 'Sesiuni încărcate!';
+        ? `${result.created} sejururi noi, ${result.skipped} existente`
+        : 'Sejururi încărcate!';
       setSyncStatus('ok', msg);
     } else {
-      setSyncStatus('error', 'Sincronizare sesiuni eșuată');
+      setSyncStatus('error', 'Sincronizare sejururi eșuată');
     }
     return result;
   }
