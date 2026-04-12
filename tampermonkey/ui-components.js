@@ -124,6 +124,11 @@ function makeFiltersCollapsible() {
   if (quickFilterButtons && quickFilterButtons.parentElement) {
     const filterParent = quickFilterButtons.parentElement;
 
+    // Add spacing between quick filter buttons
+    filterParent.querySelectorAll('input.col-filtersmr').forEach((btn) => {
+      btn.style.marginRight = "8px";
+    });
+
     // Create a clean controls row below the quick filters
     const controlsRow = document.createElement("div");
     controlsRow.style.cssText = `
