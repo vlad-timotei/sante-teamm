@@ -36,10 +36,10 @@ async function initializeBatchExtension() {
   window.addTestResultsColumn();
 
   const downloadElements = window.findDownloadElements();
-  if (downloadElements.length === 0) return;
-
-  window.injectBatchButtons(downloadElements);
-  window.createSingleProcessButton();
+  if (downloadElements.length > 0) {
+    window.injectBatchButtons(downloadElements);
+    window.createSingleProcessButton();
+  }
 
   document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("refetch-btn")) {
