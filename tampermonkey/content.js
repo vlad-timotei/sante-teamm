@@ -62,7 +62,11 @@ async function initializeBatchExtension() {
     } else {
       allSeries = await window.SyncManager.fetchAllSeries();
     }
-    const currentPrefix = await GM.getValue('sante-current-prefix', '');
+    let currentPrefix = await GM.getValue('sante-current-prefix', '');
+    if (!currentPrefix) {
+      currentPrefix = await window.SyncManager.fetchCurrentSeries() || '';
+      if (currentPrefix) await GM.setValue('sante-current-prefix', currentPrefix);
+    }
 
     allSeries.sort(naturalSortSeries).forEach((s) => {
       const opt = document.createElement("option");
