@@ -35,6 +35,21 @@ function hideCharismaFooter() {
           el.style.cssText = "";
           bottomBar.appendChild(el);
         });
+
+        const spacer = document.createElement("div");
+        spacer.style.flex = "1";
+        bottomBar.appendChild(spacer);
+
+        const dashLink = document.createElement("a");
+        dashLink.href = "#";
+        dashLink.textContent = "⚙️ Administrare Teste";
+        dashLink.style.cssText = `
+          color: #17a2b8; text-decoration: none; font-size: 12px;
+          font-weight: bold; white-space: nowrap; cursor: pointer;
+        `;
+        dashLink.onclick = (e) => { e.preventDefault(); window.openTestAdmin(); };
+        bottomBar.appendChild(dashLink);
+
         document.querySelector(".form-horizontal")?.appendChild(bottomBar);
       }
     }

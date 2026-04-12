@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sante PDF Batch Extractor
 // @namespace    https://github.com/vlad-timotei/sante-teamm
-// @version      1.9.1
+// @version      1.9.2
 // @description  Batch extract data from PDFs on rezultateptmedici.clinica-sante.ro
 // @author       Vlad T
 // @match        *://rezultateptmedici.clinica-sante.ro/*
@@ -22,6 +22,7 @@
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/csv-handler.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/export-handler.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/batch-processor.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/admin-tests.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/content.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/teamm-uploader.js
 // @updateURL    https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/sante-extractor.user.js

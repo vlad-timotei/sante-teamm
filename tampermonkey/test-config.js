@@ -1,8 +1,7 @@
-// Test Definitions v1.0.0
-// Single Source of Truth for all medical test patterns
-// Array order = extraction order = display order
+// Test Definitions v2.0.0
+// Fetches from DB via API, falls back to hardcoded defaults
 
-const TEST_DEFINITIONS = [
+const DEFAULT_TEST_DEFINITIONS = [
   { key: "FERITINA", name: "Feritina", pattern: "Feritina" },
   { key: "TSB", name: "Bilirubina totală", pattern: "Bilirubin[ăa]?\\s+total[ăa]?" },
   { key: "DBIL", name: "Bilirubina directă", pattern: "Bilirubin[ăa]?\\s+direct[ăa]?" },
@@ -47,4 +46,22 @@ const TEST_DEFINITIONS = [
   { key: "apolipoprotein-b", name: "Apolipoproteina B", pattern: "Apolipoproteina\\s+B" },
 ];
 
-window.TEST_DEFINITIONS = TEST_DEFINITIONS;
+// Will be populated from API or defaults
+window.TEST_DEFINITIONS = DEFAULT_TEST_DEFINITIONS;
+
+// Called by content.js after SyncManager is initialized
+async function loadTestDefinitions() {
+  try {
+    const result = await window.SyncManager.fetchTestDefinitions();
+    if (result?.success && result.tests && result.tests.length > 0) {
+      window.TEST_DEFINITIONS = result.tests;
+      console.log(`[Tests] Loaded ${result.tests.length} test definitions from DB`);
+    } else {
+      console.log(`[Tests] Using ${DEFAULT_TEST_DEFINITIONS.length} default test definitions`);
+    }
+  } catch (e) {
+    console.warn('[Tests] Failed to fetch from API, using defaults:', e);
+  }
+}
+
+window.loadTestDefinitions = loadTestDefinitions;

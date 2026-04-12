@@ -314,6 +314,17 @@
     return result;
   }
 
+  async function fetchTestDefinitions() {
+    setSyncStatus('syncing', 'Se încarcă testele...');
+    const result = await apiCall('GET', 'test_definitions');
+    if (result?.success) {
+      setSyncStatus('ok', `${result.tests.length} teste încărcate`);
+    } else {
+      setSyncStatus('error', 'Încărcare teste eșuată');
+    }
+    return result;
+  }
+
   async function fetchGuests(prefix) {
     setSyncStatus('syncing', `Se încarcă pacienții ${prefix}...`);
     const result = await apiCall('GET', `fetch_guests&prefix=${encodeURIComponent(prefix)}`);
@@ -353,6 +364,8 @@
     fetchAllSeries,
     syncSessions,
     fetchGuests,
+    fetchTestDefinitions,
+    apiCall,
     resetCredentials,
     getDeviceId,
     getDeviceName,

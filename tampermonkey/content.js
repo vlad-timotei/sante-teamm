@@ -20,6 +20,7 @@ async function initializeBatchExtension() {
   await window.pdfProcessor.loadPDFJS();
 
   await window.SyncManager.init();
+  await window.loadTestDefinitions();
 
   document.title = "Analize Sante";
   const existingFavicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');

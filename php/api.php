@@ -60,14 +60,29 @@ try {
 // --- Rate limiting on failed auth (5 attempts per 15 min per IP) ---
 $clientIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
-// Ensure auth_attempts table exists (lightweight check)
-$tableCheck = $pdo->query("SHOW TABLES LIKE 'auth_attempts'")->rowCount();
-if ($tableCheck === 0) {
+// Ensure tables exist (lightweight check, runs once)
+$existingTables = [];
+$tq = $pdo->query("SHOW TABLES");
+while ($t = $tq->fetchColumn()) $existingTables[] = $t;
+
+if (!in_array('auth_attempts', $existingTables)) {
     $pdo->exec("
         CREATE TABLE auth_attempts (
             ip          VARCHAR(45)  NOT NULL,
             attempted_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_ip_time (ip, attempted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
+
+if (!in_array('test_definitions', $existingTables)) {
+    $pdo->exec("
+        CREATE TABLE test_definitions (
+            sort_order   INT          NOT NULL DEFAULT 0,
+            `key`        VARCHAR(60)  NOT NULL PRIMARY KEY,
+            name         VARCHAR(120) NOT NULL,
+            pattern      VARCHAR(255) NOT NULL,
+            created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 }
@@ -326,6 +341,54 @@ switch ($action) {
             'patients' => $csvData,
             'total'    => count($csvData),
         ]);
+        break;
+
+
+    // ================================================================
+    // GET    ?action=test_definitions          -> list all
+    // POST   ?action=test_definitions          -> add/update
+    //   Body: { "key": "B12", "name": "Vitamina B12", "pattern": "Vitamina\\s+B12", "sort_order": 0 }
+    // DELETE ?action=test_definitions&key=B12  -> delete one
+    // ================================================================
+    case 'test_definitions':
+        if ($method === 'GET') {
+            $stmt = $pdo->query('SELECT `key`, name, pattern, sort_order FROM test_definitions ORDER BY sort_order, `key`');
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['success' => true, 'tests' => $rows]);
+
+        } elseif ($method === 'POST') {
+            $body = json_decode($rawInput, true);
+            if (!$body) { http_response_code(400); echo json_encode(['error' => 'Invalid JSON']); exit; }
+
+            $key       = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['key'] ?? ''), 0, 60);
+            $name      = substr(trim($body['name'] ?? ''), 0, 120);
+            $pattern   = substr(trim($body['pattern'] ?? ''), 0, 255);
+            $sortOrder = (int)($body['sort_order'] ?? 0);
+
+            if (!$key || !$name || !$pattern) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing key, name, or pattern']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare('
+                INSERT INTO test_definitions (`key`, name, pattern, sort_order)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    name       = VALUES(name),
+                    pattern    = VALUES(pattern),
+                    sort_order = VALUES(sort_order)
+            ');
+            $stmt->execute([$key, $name, $pattern, $sortOrder]);
+            echo json_encode(['success' => true]);
+
+        } elseif ($method === 'DELETE') {
+            $key = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['key'] ?? ''), 0, 60);
+            if (!$key) { http_response_code(400); echo json_encode(['error' => 'Missing key']); exit; }
+
+            $pdo->prepare('DELETE FROM test_definitions WHERE `key` = ?')->execute([$key]);
+            echo json_encode(['success' => true]);
+        }
         break;
 
 
