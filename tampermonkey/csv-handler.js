@@ -97,7 +97,7 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
   if (!csvLabel) return;
 
   if (isStored) {
-    csvLabel.innerHTML = `Sejur ${idPrefix} (${patientCount} pacienți) <span id="clear-csv-data" style="
+    csvLabel.innerHTML = `CSV: ${patientCount} pacienți <span id="clear-csv-data" style="
       margin-left: 8px;
       background: #dc3545;
       color: white;
@@ -113,7 +113,7 @@ function updateCSVButton(idPrefix, patientCount, isStored) {
     " title="Șterge datele CSV stocate">✕</span>`;
     csvLabel.style.background = "#17a2b8";
     csvLabel.style.borderColor = "#17a2b8";
-    csvLabel.title = `Se folosesc datele CSV stocate pentru prefixul ${idPrefix} cu ${patientCount} pacienți. Click pentru a înlocui cu un CSV nou.`;
+    csvLabel.title = `${patientCount} pacienți din CSV. Click pentru a înlocui.`;
 
     setTimeout(() => {
       const clearButton = document.getElementById("clear-csv-data");

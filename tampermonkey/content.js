@@ -73,29 +73,12 @@ async function initializeBatchExtension() {
     });
   }
 
-  // Add new session button
+  // Add new session button — triggers CSV file picker
   const addSessionBtn = document.getElementById("sante-add-session");
   if (addSessionBtn) {
-    addSessionBtn.addEventListener("click", async () => {
-      const newPrefix = prompt("Introduceți prefixul noii sesiuni (ex: 25S20):");
-      if (!newPrefix || !newPrefix.trim()) return;
-
-      const prefix = newPrefix.trim();
-
-      // Create the series on server by saving empty state
-      await window.SyncManager.saveState(prefix, [], null, null);
-      await window.SyncManager.setCurrentSeries(prefix);
-
-      // Add to dropdown and select it
-      const opt = document.createElement("option");
-      opt.value = prefix;
-      opt.textContent = `${prefix} (${new Date().getFullYear()})`;
-      opt.selected = true;
-      idPrefixSelect.appendChild(opt);
-      idPrefixSelect.value = prefix;
-
-      await window.syncUIWithLocalStorage();
-      window.showSuccessToast("Sesiune nouă", `Sesiunea ${prefix} a fost creată.`);
+    addSessionBtn.addEventListener("click", () => {
+      const csvInput = document.getElementById("csv-upload");
+      if (csvInput) csvInput.click();
     });
   }
 }

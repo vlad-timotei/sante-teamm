@@ -395,11 +395,12 @@ function createSingleProcessButton() {
         padding: 4px 10px;
         border-radius: 4px;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: bold;
         transition: all 0.2s;
-      " onmouseover="this.style.background='#138496'" onmouseout="this.style.background='#17a2b8'">
-        + Sesiune nouă
+        line-height: 1;
+      " onmouseover="this.style.background='#138496'" onmouseout="this.style.background='#17a2b8'" title="Sesiune nouă">
+        +
       </button>
       <label for="csv-upload" style="
         background: #28a745;
