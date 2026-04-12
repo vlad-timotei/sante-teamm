@@ -35,7 +35,15 @@ async function fetchAndApplyPatientIds(prefix) {
   }
 
   console.log(`🔄 Fetching patient IDs from API for ${prefix}...`);
-  const result = await window.SyncManager.fetchGuests(prefix);
+  let result = await window.SyncManager.fetchGuests(prefix);
+
+  // If session not found in DB, force sync sessions and retry
+  if (!result?.success) {
+    console.log(`⚠️ Session ${prefix} not in DB, syncing sessions...`);
+    await GM.deleteValue('sante-sessions-cache');
+    await window.SyncManager.syncSessions();
+    result = await window.SyncManager.fetchGuests(prefix);
+  }
 
   if (!result?.success || !result.patients) {
     console.warn(`❌ Failed to fetch patients for ${prefix}`);

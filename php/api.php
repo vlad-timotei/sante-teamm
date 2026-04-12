@@ -65,6 +65,31 @@ $existingTables = [];
 $tq = $pdo->query("SHOW TABLES");
 while ($t = $tq->fetchColumn()) $existingTables[] = $t;
 
+if (!in_array('users', $existingTables)) {
+    $pdo->exec("
+        CREATE TABLE users (
+            id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            username     VARCHAR(60)  NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
+
+if (!in_array('series_state', $existingTables)) {
+    $pdo->exec("
+        CREATE TABLE series_state (
+            prefix            VARCHAR(30)  NOT NULL PRIMARY KEY,
+            teamm_session_id  VARCHAR(30),
+            export_queue      LONGTEXT,
+            updated_at        DATETIME     NOT NULL,
+            updated_by        VARCHAR(64),
+            device_name       VARCHAR(100),
+            is_current        TINYINT(1)   NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
+
 if (!in_array('auth_attempts', $existingTables)) {
     $pdo->exec("
         CREATE TABLE auth_attempts (
