@@ -1,4 +1,4 @@
-// Admin Tests v1.0.0
+// Admin Tests v1.1.0
 // Modal UI for managing test definitions, injected into the Sante portal
 
 function openTestAdmin() {
@@ -56,10 +56,6 @@ function openTestAdmin() {
             <label style="display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 3px;">Text din PDF</label>
             <input type="text" id="ta-pattern" placeholder="ex: Vitamina B12" style="width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
           </div>
-          <div style="flex: 0 0 60px;">
-            <label style="display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 3px;">Ordine</label>
-            <input type="number" id="ta-order" value="0" style="width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
-          </div>
           <div style="flex: 0 0 auto;">
             <button data-action="save" id="ta-save-btn" style="
               padding: 7px 18px; border: none; border-radius: 16px; font-size: 12px;
@@ -95,7 +91,7 @@ function openTestAdmin() {
     const action = btn.dataset.action;
     if (action === "save") taAdminSave();
     else if (action === "close") closeTestAdmin();
-    else if (action === "edit") taAdminEdit(JSON.parse(btn.dataset.test));
+    else if (action === "edit") taAdminEdit(window._taTests[parseInt(btn.dataset.index)]);
     else if (action === "delete") taAdminDelete(btn.dataset.key);
   });
 
@@ -114,6 +110,7 @@ async function taLoadTests() {
   if (!result?.success) return;
 
   const tests = result.tests || [];
+  window._taTests = tests;
   document.getElementById("ta-count").textContent = tests.length;
 
   if (tests.length === 0) {
@@ -122,24 +119,22 @@ async function taLoadTests() {
     return;
   }
 
+  const thStyle = 'text-align: left; padding: 8px 10px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-size: 11px; color: #666; text-transform: uppercase;';
   let html = `<table style="width: 100%; border-collapse: collapse;">
     <thead><tr>
-      <th style="text-align: left; padding: 8px 10px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-size: 11px; color: #666; text-transform: uppercase;">#</th>
-      <th style="text-align: left; padding: 8px 10px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-size: 11px; color: #666; text-transform: uppercase;">Cheie</th>
-      <th style="text-align: left; padding: 8px 10px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-size: 11px; color: #666; text-transform: uppercase;">Nume</th>
-      <th style="text-align: left; padding: 8px 10px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-size: 11px; color: #666; text-transform: uppercase;">Pattern</th>
-      <th style="text-align: left; padding: 8px 10px; background: #f8f9fa; border-bottom: 2px solid #dee2e6;"></th>
+      <th style="${thStyle}">Cheie</th>
+      <th style="${thStyle}">Nume</th>
+      <th style="${thStyle}">Pattern</th>
+      <th style="${thStyle}"></th>
     </tr></thead><tbody>`;
 
-  tests.forEach((t) => {
-    const safeT = escHtml(JSON.stringify(t));
+  tests.forEach((t, i) => {
     html += `<tr style="border-bottom: 1px solid #eee;">
-      <td style="padding: 6px 10px;">${t.sort_order}</td>
       <td style="padding: 6px 10px; font-weight: bold;">${escHtml(t.key)}</td>
       <td style="padding: 6px 10px;">${escHtml(t.name)}</td>
       <td style="padding: 6px 10px; font-family: monospace; font-size: 11px; color: #666; word-break: break-all;">${escHtml(t.pattern)}</td>
       <td style="padding: 6px 10px; white-space: nowrap;">
-        <button data-action="edit" data-test="${safeT}" style="
+        <button data-action="edit" data-index="${i}" style="
           padding: 3px 10px; border: none; border-radius: 12px; font-size: 11px;
           cursor: pointer; background: #17a2b8; color: white; margin-right: 4px;
         ">✏️</button>
@@ -165,7 +160,6 @@ async function taAdminSave() {
   const key = document.getElementById("ta-key").value.trim();
   const name = document.getElementById("ta-name").value.trim();
   const rawText = document.getElementById("ta-pattern").value.trim();
-  const sortOrder = parseInt(document.getElementById("ta-order").value) || 0;
   const isRawRegex = document.getElementById("ta-raw-regex").checked;
 
   if (!key || !name || !rawText) {
@@ -176,13 +170,12 @@ async function taAdminSave() {
   const pattern = isRawRegex ? rawText : textToPattern(rawText);
 
   const result = await window.SyncManager.apiCall("POST", "test_definitions", {
-    key, name, pattern, sort_order: sortOrder,
+    key, name, pattern,
   });
 
   if (result?.success) {
     taClearForm();
     taLoadTests();
-    // Refresh in-memory test definitions
     await window.loadTestDefinitions();
   } else {
     alert("Eroare la salvare.");
@@ -193,7 +186,6 @@ function taAdminEdit(t) {
   document.getElementById("ta-key").value = t.key;
   document.getElementById("ta-name").value = t.name;
   document.getElementById("ta-pattern").value = t.pattern;
-  document.getElementById("ta-order").value = t.sort_order || 0;
   document.getElementById("ta-raw-regex").checked = true;
   document.getElementById("ta-form-title").textContent = "Editează: " + t.name;
   document.getElementById("ta-save-btn").textContent = "Actualizează";
@@ -219,7 +211,6 @@ function taClearForm() {
   document.getElementById("ta-key").value = "";
   document.getElementById("ta-name").value = "";
   document.getElementById("ta-pattern").value = "";
-  document.getElementById("ta-order").value = "0";
   document.getElementById("ta-raw-regex").checked = false;
   document.getElementById("ta-form-title").textContent = "Adaugă test nou";
   document.getElementById("ta-save-btn").textContent = "Salvează";

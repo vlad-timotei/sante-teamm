@@ -78,7 +78,6 @@ if (!in_array('auth_attempts', $existingTables)) {
 if (!in_array('test_definitions', $existingTables)) {
     $pdo->exec("
         CREATE TABLE test_definitions (
-            sort_order   INT          NOT NULL DEFAULT 0,
             `key`        VARCHAR(60)  NOT NULL PRIMARY KEY,
             name         VARCHAR(120) NOT NULL,
             pattern      VARCHAR(255) NOT NULL,
@@ -352,7 +351,7 @@ switch ($action) {
     // ================================================================
     case 'test_definitions':
         if ($method === 'GET') {
-            $stmt = $pdo->query('SELECT `key`, name, pattern, sort_order FROM test_definitions ORDER BY sort_order, `key`');
+            $stmt = $pdo->query('SELECT `key`, name, pattern FROM test_definitions ORDER BY `key`');
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode(['success' => true, 'tests' => $rows]);
 
@@ -360,10 +359,9 @@ switch ($action) {
             $body = json_decode($rawInput, true);
             if (!$body) { http_response_code(400); echo json_encode(['error' => 'Invalid JSON']); exit; }
 
-            $key       = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['key'] ?? ''), 0, 60);
-            $name      = substr(trim($body['name'] ?? ''), 0, 120);
-            $pattern   = substr(trim($body['pattern'] ?? ''), 0, 255);
-            $sortOrder = (int)($body['sort_order'] ?? 0);
+            $key     = substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $body['key'] ?? ''), 0, 60);
+            $name    = substr(trim($body['name'] ?? ''), 0, 120);
+            $pattern = substr(trim($body['pattern'] ?? ''), 0, 255);
 
             if (!$key || !$name || !$pattern) {
                 http_response_code(400);
@@ -372,14 +370,13 @@ switch ($action) {
             }
 
             $stmt = $pdo->prepare('
-                INSERT INTO test_definitions (`key`, name, pattern, sort_order)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO test_definitions (`key`, name, pattern)
+                VALUES (?, ?, ?)
                 ON DUPLICATE KEY UPDATE
-                    name       = VALUES(name),
-                    pattern    = VALUES(pattern),
-                    sort_order = VALUES(sort_order)
+                    name    = VALUES(name),
+                    pattern = VALUES(pattern)
             ');
-            $stmt->execute([$key, $name, $pattern, $sortOrder]);
+            $stmt->execute([$key, $name, $pattern]);
             echo json_encode(['success' => true]);
 
         } elseif ($method === 'DELETE') {
