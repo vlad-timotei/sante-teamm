@@ -1,4 +1,4 @@
-// Batch Processor v1.2.0
+// Batch Processor v1.3.0
 // Batch processing, PDF download, and analysis functions
 
 // Global state for batch processing (using window.* to avoid shadowing issues)
