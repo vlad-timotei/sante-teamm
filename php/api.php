@@ -251,6 +251,7 @@ switch ($action) {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_HTTPHEADER     => [
+                'Origin: https://centruldumbrava.ro',
                 'X-API-APP-ID: '     . TEAMM_APP_ID,
                 'X-API-SECRET-KEY: ' . TEAMM_SECRET_KEY,
                 'X-API-PUBLIC-KEY: ' . TEAMM_PUBLIC_KEY,
@@ -332,6 +333,7 @@ switch ($action) {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_HTTPHEADER     => [
+                'Origin: https://centruldumbrava.ro',
                 'X-API-APP-ID: '     . TEAMM_APP_ID,
                 'X-API-SECRET-KEY: ' . TEAMM_SECRET_KEY,
                 'X-API-PUBLIC-KEY: ' . TEAMM_PUBLIC_KEY,
