@@ -27,6 +27,31 @@ async function waitForFileInput(timeout = 10000) {
   throw new Error("File input not found within timeout");
 }
 
+async function findUploadElement(selector, timeout = 5000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const el = document.querySelector(selector);
+    if (el) return el;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return null;
+}
+
+async function findImportButtonByText(label, timeout = 5000) {
+  const target = String(label).replace(/\s+/g, " ").trim().toLowerCase();
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const candidates = document.querySelectorAll('button, a, [role="button"]');
+    for (const el of candidates) {
+      if (el.disabled) continue;
+      const t = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (t === target || t.includes(target)) return el;
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return null;
+}
+
 function createFileFromContent(content, filename) {
   const blob = new Blob([content], { type: "text/plain" });
   return new File([blob], filename, { type: "text/plain" });
@@ -98,7 +123,7 @@ async function autoUploadFile() {
       return;
     }
 
-    const { content, filename, expiresAt } = result.pendingUpload;
+    const { content, filename, expiresAt, autoSubmit } = result.pendingUpload;
 
     if (Date.now() > expiresAt) {
       console.warn("⚠️ Upload data expired (>5 minutes old), cleaning up");
@@ -129,7 +154,39 @@ async function autoUploadFile() {
 
     await StorageAdapter.remove("pendingUpload");
     console.log("🧹 Storage cleaned up");
-    console.log("🎉 Upload complete!");
+    console.log("🎉 File set on input!");
+
+    if (autoSubmit) {
+      console.log("⏳ autoSubmit=true → așteaptă 5s apoi apasă 'Importă datele'");
+      showTeammNotification("⏳ Apăs 'Importă datele' în 5 secunde...", "success");
+      await new Promise((r) => setTimeout(r, 5000));
+      const importBtn = await findImportButtonByText("Importă datele", 5000);
+      if (!importBtn) {
+        console.warn("⚠️ Butonul 'Importă datele' nu a fost găsit");
+        showTeammNotification("⚠️ Butonul 'Importă datele' nu a fost găsit — apasă manual", "error");
+        return;
+      }
+      importBtn.click();
+      console.log("✅ Clicked 'Importă datele'");
+      showTeammNotification("✅ Apăsat 'Importă datele'. Aștept dialogul de confirmare...", "success");
+
+      // Confirmation dialog opens with a "Da" button (test-id="confirm_dialog_yes").
+      await new Promise((r) => setTimeout(r, 800));
+      const confirmBtn = await findUploadElement('button[test-id="confirm_dialog_yes"]', 5000);
+      if (!confirmBtn) {
+        console.warn("⚠️ Butonul de confirmare 'Da' nu a fost găsit");
+        showTeammNotification("⚠️ Dialogul de confirmare nu a apărut — confirmă manual", "error");
+        return;
+      }
+      confirmBtn.click();
+      console.log("✅ Clicked 'Da' (confirm)");
+      showTeammNotification("✅ Confirmat. Navighez către verificare în 5s...", "success");
+
+      await new Promise((r) => setTimeout(r, 5000));
+      window.location.assign(
+        "https://teamm.work/admin/guests/medical/69f1d092d628481b6aa342cd?sessionId=6437b075e54b0f198f3d52eb&tab-body=analize"
+      );
+    }
   } catch (error) {
     console.error("❌ Upload failed:", error);
     showTeammNotification(`❌ Upload eșuat: ${error.message}`, "error");

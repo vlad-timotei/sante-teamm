@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Sante PDF Batch Extractor
 // @namespace    https://github.com/vlad-timotei/sante-teamm
-// @version      1.9.9
+// @version      1.10.0
 // @description  Batch extract data from PDFs on rezultateptmedici.clinica-sante.ro
 // @author       Vlad T
 // @match        *://rezultateptmedici.clinica-sante.ro/*
 // @match        *://teamm.work/admin/guests/intake-values-import-dumbrava*
+// @match        *://teamm.work/admin/medical/*
+// @match        *://teamm.work/admin/general-config/*
 // @grant        GM.setValue
 // @grant        GM.getValue
 // @grant        GM.deleteValue
@@ -25,6 +27,7 @@
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/admin-tests.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/content.js
 // @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/teamm-uploader.js
+// @require      https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/teamm-test-setup.js
 // @updateURL    https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/sante-extractor.user.js
 // @downloadURL  https://raw.githubusercontent.com/vlad-timotei/sante-teamm/main/tampermonkey/sante-extractor.user.js
 // @run-at       document-end
@@ -61,6 +64,16 @@
       window.startUploadWithDelay();
     } else {
       console.error("❌ startUploadWithDelay not found");
+    }
+  } else if (
+    currentURL.includes("teamm.work/admin/medical/") ||
+    currentURL.includes("teamm.work/admin/general-config/")
+  ) {
+    console.log("🧪 Running on Teamm.work admin page (test setup flow)");
+    if (typeof window.handleTeammTestSetup === "function") {
+      window.handleTeammTestSetup();
+    } else {
+      console.error("❌ handleTeammTestSetup not found");
     }
   }
 })();
