@@ -600,7 +600,9 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
 
     if (allExported) {
       exportedBadge = `
-        <div style="
+        <div class="exported-badge"
+          data-patient-key="${patientKey || ""}"
+          style="
           display: inline-block;
           background: #28a745;
           color: white;
@@ -609,14 +611,16 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
           font-size: 11px;
           font-weight: bold;
           margin-bottom: 4px;
-          cursor: help;
-        " title="Toate cele ${totalTests} analize exportate la: ${exportDate}">
+          cursor: context-menu;
+        " title="Toate cele ${totalTests} analize exportate la: ${exportDate}. Click dreapta pentru a reimporta.">
           ✓ Exportat
         </div>
       `;
     } else {
       exportedBadge = `
-        <div style="
+        <div class="exported-badge"
+          data-patient-key="${patientKey || ""}"
+          style="
           display: inline-block;
           background: #ffc107;
           color: #212529;
@@ -625,8 +629,8 @@ function displayTestResults(testResultCell, extractedData, patientKey = null) {
           font-size: 11px;
           font-weight: bold;
           margin-bottom: 4px;
-          cursor: help;
-        " title="${exportedCount}/${totalTests} analize exportate. ${totalTests - exportedCount} analiză(e) în așteptare.">
+          cursor: context-menu;
+        " title="${exportedCount}/${totalTests} analize exportate. ${totalTests - exportedCount} analiză(e) în așteptare. Click dreapta pentru a reimporta.">
           ⚡ ${exportedCount}/${totalTests} Exportate
         </div>
       `;
@@ -814,6 +818,335 @@ function showSuccessToast(title, message) {
   }, 5000);
 }
 
+// Escape a string for safe interpolation into innerHTML. Lab values may
+// contain comparator symbols like "<0.01" that would otherwise be parsed as
+// markup.
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Right-click menu shown on the "✓ Exportat" badge. Single action that opens
+// the re-import picker for that patient.
+function showReimportContextMenu(x, y, patientKey) {
+  document.getElementById("reimport-context-menu")?.remove();
+
+  const menu = document.createElement("div");
+  menu.id = "reimport-context-menu";
+  menu.style.cssText = `
+    position: fixed; top: ${y}px; left: ${x}px;
+    background: white; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    z-index: 100010; overflow: hidden; min-width: 170px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  `;
+
+  const makeItem = (text, onClick) => {
+    const item = document.createElement("button");
+    item.textContent = text;
+    item.style.cssText = `
+      display: block; width: 100%; text-align: left;
+      padding: 10px 16px; border: none; background: white;
+      font-size: 13px; font-weight: 600; color: #17a2b8; cursor: pointer;
+    `;
+    item.onmouseenter = () => (item.style.background = "#f1f3f5");
+    item.onmouseleave = () => (item.style.background = "white");
+    item.onclick = () => {
+      menu.remove();
+      onClick();
+    };
+    return item;
+  };
+
+  menu.appendChild(
+    makeItem("🔄 Reîncarcă…", () => openReimportModal(patientKey))
+  );
+  menu.appendChild(
+    makeItem("🔄 Reîncarcă tot", () => reimportAllForPatient(patientKey))
+  );
+
+  document.body.appendChild(menu);
+
+  // Keep the menu on screen if opened near the right/bottom edge.
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    menu.style.left = `${Math.max(4, window.innerWidth - rect.width - 4)}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    menu.style.top = `${Math.max(4, window.innerHeight - rect.height - 4)}px`;
+  }
+
+  const close = (e) => {
+    if (!menu.contains(e.target)) {
+      menu.remove();
+      document.removeEventListener("click", close, true);
+      document.removeEventListener("contextmenu", close, true);
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener("click", close, true);
+    document.addEventListener("contextmenu", close, true);
+  }, 0);
+}
+
+// Modal to pick which of a patient's already-exported analyses should be
+// re-imported. Selecting an analysis simply un-marks it as exported so it
+// re-enters the batch queue — the user then presses the blue "Export" button
+// at the top to re-import everything pending in one go.
+async function openReimportModal(patientKey) {
+  if (!patientKey) {
+    window.showWarningToast(
+      "⚠️ Nu pot reimporta",
+      "Selectează mai întâi o serie (prefix ID)."
+    );
+    return;
+  }
+
+  document.getElementById("reimport-overlay")?.remove();
+
+  const queue = await window.loadQueueFromDB();
+  const patient = window.findPatientByKey(queue, patientKey);
+  if (!patient) {
+    window.showWarningToast(
+      "⚠️ Pacient negăsit",
+      "Nu am găsit datele pacientului pentru reimport."
+    );
+    return;
+  }
+
+  const testResults = patient.structuredData?.testResults || {};
+  const exportedTests = patient.exportedTests || {};
+  const DISPLAY = Object.fromEntries(
+    window.TEST_DEFINITIONS.map((t) => [t.key, t.name])
+  );
+  const ORDER = window.TEST_DEFINITIONS.map((t) => t.key);
+  const keys = Object.keys(testResults).sort((a, b) => {
+    const ai = ORDER.indexOf(a);
+    const bi = ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  if (keys.length === 0) {
+    window.showWarningToast(
+      "⚠️ Fără analize",
+      "Acest pacient nu are analize de reimportat."
+    );
+    return;
+  }
+
+  const patientName = patient.patientInfo?.nume || "Pacient";
+
+  const overlay = document.createElement("div");
+  overlay.id = "reimport-overlay";
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 100005; display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  `;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+
+  const rows = keys
+    .map((key) => {
+      const label = DISPLAY[key] || key;
+      const value = testResults[key]?.value || "N/A";
+      const isExported = !!exportedTests[key];
+      const statusText = isExported
+        ? '<span style="color:#28a745;font-weight:600;">✓ importat</span>'
+        : '<span style="color:#dc3545;font-weight:600;">○ neimportat</span>';
+      return `
+        <label style="
+          display:flex; align-items:center; gap:10px;
+          padding:8px 10px; border-bottom:1px solid #eee; cursor:pointer;
+        ">
+          <input type="checkbox" class="reimport-test" data-key="${key}"
+            style="width:16px;height:16px;cursor:pointer;">
+          <span style="flex:1;font-size:13px;color:#212529;">
+            ${escapeHtml(label)}: <strong>${escapeHtml(value)}</strong>
+          </span>
+          <span style="font-size:11px;">${statusText}</span>
+        </label>
+      `;
+    })
+    .join("");
+
+  const modal = document.createElement("div");
+  modal.style.cssText = `
+    background:#f5f6fa; border-radius:12px; width:90%; max-width:520px;
+    max-height:85vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.3);
+  `;
+  modal.innerHTML = `
+    <div style="
+      background:linear-gradient(135deg,#17a2b8,#1289a0);
+      color:white; padding:14px 20px; border-radius:12px 12px 0 0;
+      display:flex; align-items:center; justify-content:space-between;
+    ">
+      <span style="font-size:15px;font-weight:bold;">🔄 Reimportă analize — ${escapeHtml(patientName)}</span>
+      <button data-action="close" style="
+        background:none;border:none;color:white;font-size:20px;
+        cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+    </div>
+
+    <div style="padding:16px 20px;">
+      <div style="
+        background:#fff3cd; color:#856404; border:1px solid #ffeeba;
+        border-radius:6px; padding:10px 12px; margin-bottom:14px;
+        font-size:12px; font-weight:600;
+      ">
+        ⚠️ Verifică că nu sunt importate deja!
+      </div>
+
+      <label style="
+        display:flex; align-items:center; gap:10px;
+        padding:8px 10px; margin-bottom:6px; cursor:pointer;
+        font-size:12px; font-weight:600; color:#495057;
+      ">
+        <input type="checkbox" id="reimport-select-all"
+          style="width:16px;height:16px;cursor:pointer;">
+        Selectează toate
+      </label>
+
+      <div style="background:white;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;">
+        ${rows}
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+        <button data-action="cancel" style="
+          padding:9px 18px; border:none; border-radius:18px; font-size:13px;
+          font-weight:600; cursor:pointer; background:#e9ecef; color:#495057;
+        ">Anulează</button>
+        <button data-action="confirm" style="
+          padding:9px 18px; border:none; border-radius:18px; font-size:13px;
+          font-weight:600; cursor:pointer;
+          background:linear-gradient(135deg,#17a2b8,#1289a0); color:white;
+          box-shadow:0 2px 6px rgba(23,162,184,0.35);
+        ">🔄 Marchează pentru reimport</button>
+      </div>
+    </div>
+  `;
+
+  modal.querySelector("#reimport-select-all").addEventListener("change", (e) => {
+    modal
+      .querySelectorAll(".reimport-test")
+      .forEach((cb) => (cb.checked = e.target.checked));
+  });
+
+  modal.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+
+    if (action === "close" || action === "cancel") {
+      overlay.remove();
+      return;
+    }
+
+    if (action === "confirm") {
+      const selectedKeys = Array.from(
+        modal.querySelectorAll(".reimport-test:checked")
+      ).map((cb) => cb.dataset.key);
+
+      if (selectedKeys.length === 0) {
+        window.showWarningToast(
+          "⚠️ Nicio analiză selectată",
+          "Bifează cel puțin o analiză pentru reimport."
+        );
+        return;
+      }
+
+      const result = await markTestsForReimport(patientKey, selectedKeys);
+      if (!result) return; // warning already shown; keep modal open to retry
+      overlay.remove();
+
+      window.showSuccessToast(
+        "🔄 Pregătit pentru reimport",
+        `${result.count} analiză(e) marcate ca neimportate pentru ${escapeHtml(result.patientName)}. Apasă butonul albastru „Export" de sus pentru a le reimporta.`
+      );
+    }
+  });
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+// Un-mark test keys as exported for a patient, so they re-enter the batch
+// export queue. Pass `testKeys = null` to reimport all of the patient's
+// analyses. Loads the queue once, persists, and refreshes the UI + count.
+// Shows the relevant warning toast and returns null on any failure; on success
+// returns { patientName, count }.
+async function markTestsForReimport(patientKey, testKeys = null) {
+  if (!patientKey) {
+    window.showWarningToast(
+      "⚠️ Nu pot reimporta",
+      "Selectează mai întâi o serie (prefix ID)."
+    );
+    return null;
+  }
+
+  const queue = await window.loadQueueFromDB();
+  const patient = window.findPatientByKey(queue, patientKey);
+  if (!patient) {
+    window.showWarningToast(
+      "⚠️ Pacient negăsit",
+      "Nu am găsit datele pacientului pentru reimport."
+    );
+    return null;
+  }
+
+  if (!patient.exportedTests || Array.isArray(patient.exportedTests)) {
+    patient.exportedTests = {};
+  }
+
+  const testResults = patient.structuredData?.testResults || {};
+  const keys = testKeys ?? Object.keys(testResults);
+  if (keys.length === 0) {
+    window.showWarningToast(
+      "⚠️ Fără analize",
+      "Acest pacient nu are analize de reimportat."
+    );
+    return null;
+  }
+
+  keys.forEach((key) => {
+    delete patient.exportedTests[key];
+  });
+
+  const stillFullyExported = Object.keys(testResults).every(
+    (key) => patient.exportedTests[key]
+  );
+  if (!stillFullyExported) {
+    patient.exported = false;
+    patient.exportedAt = null;
+  }
+
+  await window.saveQueueToDB(queue);
+  await window.updateExportCount();
+  await window.syncUIWithLocalStorage();
+
+  const patientName = patient.patientInfo?.nume || "";
+  console.log(
+    `🔄 Marked ${keys.length} test(s) for reimport on ${patientName}:`,
+    keys
+  );
+  return { patientName, count: keys.length };
+}
+
+// Quick path: mark every one of a patient's analyses for reimport without
+// opening the picker modal.
+async function reimportAllForPatient(patientKey) {
+  const result = await markTestsForReimport(patientKey);
+  if (!result) return; // warning already shown by markTestsForReimport
+
+  window.showSuccessToast(
+    "🔄 Pregătit pentru reimport",
+    `Toate cele ${result.count} analize ale pacientului ${escapeHtml(result.patientName)} au fost marcate ca neimportate. Apasă butonul albastru „Export" de sus pentru a le reimporta.`
+  );
+}
+
 // Export to window
 window.hideCharismaFooter = hideCharismaFooter;
 window.makeFiltersCollapsible = makeFiltersCollapsible;
@@ -825,4 +1158,8 @@ window.createSingleProcessButton = createSingleProcessButton;
 window.displayTestResults = displayTestResults;
 window.updateTestResultsColumn = updateTestResultsColumn;
 window.showWarningToast = showWarningToast;
+window.showReimportContextMenu = showReimportContextMenu;
+window.openReimportModal = openReimportModal;
+window.markTestsForReimport = markTestsForReimport;
+window.reimportAllForPatient = reimportAllForPatient;
 window.showSuccessToast = showSuccessToast;

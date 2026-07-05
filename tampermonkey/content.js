@@ -50,6 +50,14 @@ async function initializeBatchExtension() {
     }
   });
 
+  // Right-click the "✓ Exportat" badge → offer to re-import selected analyses.
+  document.addEventListener("contextmenu", (e) => {
+    const badge = e.target.closest(".exported-badge");
+    if (!badge) return;
+    e.preventDefault();
+    window.showReimportContextMenu(e.clientX, e.clientY, badge.dataset.patientKey);
+  });
+
   const idPrefixSelect = document.getElementById("id-prefix");
 
   // Load sessions (cached or from API)

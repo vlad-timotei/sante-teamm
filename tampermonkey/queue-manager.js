@@ -27,6 +27,14 @@ async function getQueueData() {
   return await loadQueueFromDB();
 }
 
+// Find a queued patient by its normalized `${prefix}_${name}` key.
+function findPatientByKey(queue, patientKey) {
+  return (queue || []).find(
+    (p) =>
+      getPatientKey(p.patientInfo?.idPrefix, p.patientInfo?.nume) === patientKey
+  );
+}
+
 async function clearQueue() {
   const state = window.SyncManager?.getCachedState();
   if (!state?.prefix) {
@@ -80,5 +88,6 @@ window.getPatientKey = getPatientKey;
 window.loadQueueFromDB = loadQueueFromDB;
 window.saveQueueToDB = saveQueueToDB;
 window.getQueueData = getQueueData;
+window.findPatientByKey = findPatientByKey;
 window.clearQueue = clearQueue;
 window.resetExportedStatus = resetExportedStatus;
