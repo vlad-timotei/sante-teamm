@@ -116,6 +116,16 @@ function matchCSVToTablePatients(csvPatients) {
   console.log(`Found ${tablePatients.length} patients in table`);
   console.log(`Found ${csvPatients.length} patients in data`);
 
+  console.groupCollapsed(`[Match] API names (${csvPatients.length})`);
+  console.table(
+    csvPatients.map((p) => ({
+      name: p.name,
+      normalized: normalizedName(p.name),
+      fullId: p.fullId || "(fără ID)",
+    })),
+  );
+  console.groupEnd();
+
   const matches = [];
   const unmatched = [];
   const usedCSVPatients = new Set();
@@ -170,6 +180,17 @@ function matchCSVToTablePatients(csvPatients) {
           bestScore >= 0.95 ? "exact" : bestScore >= 0.85 ? "good" : "partial",
       });
     } else {
+      console.warn(
+        `[Match] ✗ No match for table "${tablePatient.name}" (normalized: "${tableName}"). ` +
+          `Best candidate: ${
+            bestMatch
+              ? `"${bestMatch.patient.name}" (normalized: "${normalizedName(
+                  bestMatch.patient.name,
+                )}") score ${bestScore.toFixed(3)} — below threshold 0.666`
+              : "none (no API patients compared)"
+          }`,
+      );
+
       unmatched.push({
         tablePatient: tablePatient,
         bestMatch: bestMatch?.patient,
