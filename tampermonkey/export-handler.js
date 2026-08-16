@@ -1,6 +1,24 @@
 // Export Handler v1.1.0
 // Data export and upload functionality
 
+// Diacritic-, case- and whitespace-insensitive status check so DOM titles like
+// "Rezultate parțiale" (ț) / "În lucru" (Î) still match the plain-ASCII forms.
+function isExportableStatus(status) {
+  const s = (status || "")
+    .toLowerCase()
+    .replace(/[ăâîșțşţ]/g, (m) => {
+      const map = { ă: "a", â: "a", î: "i", ș: "s", ț: "t", ş: "s", ţ: "t" };
+      return map[m] || m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+  return (
+    s === "efectuat cu rezultate" ||
+    s === "in lucru" ||
+    s === "rezultate partiale"
+  );
+}
+
 async function exportData() {
   console.log("=== EXPORT DEBUG ===");
 
@@ -320,7 +338,7 @@ async function updateDownloadCount() {
 
     if (statusIcon) {
       const statusTitle = statusIcon.getAttribute("title");
-      if (statusTitle !== "Efectuat cu rezultate" && statusTitle !== "In lucru" && statusTitle !== "Rezultate partiale") return false;
+      if (!isExportableStatus(statusTitle)) return false;
     } else {
       return false;
     }

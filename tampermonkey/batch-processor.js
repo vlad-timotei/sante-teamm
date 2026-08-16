@@ -1,6 +1,32 @@
 // Batch Processor v1.3.0
 // Batch processing, PDF download, and analysis functions
 
+// Status matching helpers — compare diacritic-, case- and whitespace-
+// insensitively so DOM titles like "Rezultate parțiale" (ț) / "În lucru" (Î)
+// still match the plain-ASCII whitelist forms below.
+function normalizeStatusTitle(status) {
+  return (status || "")
+    .toLowerCase()
+    .replace(/[ăâîșțşţ]/g, (m) => {
+      const map = { ă: "a", â: "a", î: "i", ș: "s", ț: "t", ş: "s", ţ: "t" };
+      return map[m] || m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function isAllowedStatus(status) {
+  const s = normalizeStatusTitle(status);
+  return (
+    s === "efectuat cu rezultate" ||
+    s === "in lucru" ||
+    s === "rezultate partiale"
+  );
+}
+function isPartialStatus(status) {
+  const s = normalizeStatusTitle(status);
+  return s === "in lucru" || s === "rezultate partiale";
+}
+
 // Global state for batch processing (using window.* to avoid shadowing issues)
 window.batchCounter = 0;
 window.extractedData = [];
@@ -49,10 +75,10 @@ async function addToBatch(element, index, batchBtn) {
     const statusTitle = statusIcon.getAttribute("title");
     console.log(`🔍 Checking status for patient: ${statusTitle}`);
 
-    if (statusTitle === "Efectuat cu rezultate" || statusTitle === "In lucru" || statusTitle === "Rezultate partiale") {
+    if (isAllowedStatus(statusTitle)) {
       importedStatus = statusTitle;
 
-      if (statusTitle === "In lucru" || statusTitle === "Rezultate partiale") {
+      if (isPartialStatus(statusTitle)) {
         console.log(
           `⚠️ Patient has "${statusTitle}" status - results may be partial. You can refetch later when complete.`
         );
@@ -534,14 +560,14 @@ async function analyzeCurrentPage() {
       if (statusIcon) {
         const statusTitle = statusIcon.getAttribute("title");
 
-        if (statusTitle !== "Efectuat cu rezultate" && statusTitle !== "In lucru" && statusTitle !== "Rezultate partiale") {
+        if (!isAllowedStatus(statusTitle)) {
           console.log(
             `⏭️ Skipping patient with ID suffix ${idSuffix} - status: "${statusTitle}" (not allowed)`
           );
           return;
         }
 
-        if (statusTitle === "In lucru" || statusTitle === "Rezultate partiale") {
+        if (isPartialStatus(statusTitle)) {
           console.log(
             `⚠️ Including patient with ID suffix ${idSuffix} - status: "${statusTitle}" (partial results)`
           );

@@ -84,18 +84,9 @@ function matchCSVToTablePatients(csvPatients) {
       const downloadLink = row.querySelector('a[id*="lnkView"]');
       if (downloadLink) {
         const statusIcon = row.querySelector(".glyphicon");
-        if (statusIcon) {
-          const statusTitle = statusIcon.getAttribute("title");
 
-          if (
-            statusTitle !== "Efectuat cu rezultate" &&
-            statusTitle !== "In lucru" &&
-            statusTitle !== "Rezultate partiale"
-          ) {
-            return;
-          }
-        }
-
+        // Pre-fill the matched ID for every row regardless of status — the ID
+        // is only a hint. Status still recorded below as importedStatus.
         const name = cells[1]?.textContent.trim();
         if (name) {
           const tablePatientId = `${name}_${downloadLink.id}_${rowIndex}`;
@@ -339,6 +330,12 @@ function displayMatchResults(results) {
       }
       autoFilled++;
 
+      console.log(
+        `[Match] ✓ Filled "${match.tablePatient.name}" ← "${match.csvPatient.name}" ` +
+          `(fullId: ${match.csvPatient.fullId || "fără ID"}, ` +
+          `suffix: "${match.idSuffix || "(empty)"}", score ${match.similarity.toFixed(3)})`,
+      );
+
       const nameCell = match.tablePatient.row.cells[1];
       if (nameCell && !nameCell.querySelector(".csv-match")) {
         const matchIndicator = document.createElement("div");
@@ -357,14 +354,16 @@ function displayMatchResults(results) {
         nameCell.appendChild(matchIndicator);
       }
     } else {
-      console.error(`❌ Input not found for link: ${linkId}`);
+      console.error(
+        `❌ Input not found for "${match.tablePatient.name}" (link: ${linkId}) — matched but NOT filled`,
+      );
     }
   });
 
   resultsDiv.style.display = "none";
 
   console.log(
-    `✅ Matching complete: ${matches.length} matched, ${unmatched.length} require manual attention`,
+    `✅ Matching complete: ${matches.length} matched (${autoFilled} filled), ${unmatched.length} require manual attention`,
   );
 }
 
