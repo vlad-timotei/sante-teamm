@@ -50,21 +50,7 @@
   // ----------------------------------------------------------------
 
   async function getApiBase() {
-    if (_apiBase) return _apiBase;
-    let url = await GM.getValue('sante-api-url', '');
-    if (!url) {
-      url = prompt(
-        'Sante Sync - URL API:\n' +
-        '(Cereți administratorului acest URL - nu este public)'
-      );
-      if (!url || !url.trim()) {
-        setSyncStatus('error', 'Fără URL API - sincronizare dezactivată');
-        return null;
-      }
-      url = url.trim().replace(/\/$/, '');
-      await GM.setValue('sante-api-url', url);
-    }
-    _apiBase = url;
+    _apiBase = 'https://centruldumbrava.ro/analize/api/index.php';
     return _apiBase;
   }
 
