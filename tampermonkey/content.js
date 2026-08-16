@@ -1,6 +1,19 @@
 // Content v2.2.0
 // Main initialization — DB-only sync, API-based patient IDs
 
+// Diacritic-, case- and whitespace-insensitive status normalizer so DOM titles
+// like "Rezultate parțiale" (ț) / "În lucru" (Î) match plain-ASCII comparisons.
+function normalizeStatusTitle(status) {
+  return (status || "")
+    .toLowerCase()
+    .replace(/[ăâîșțşţ]/g, (m) => {
+      const map = { ă: "a", â: "a", î: "i", ș: "s", ț: "t", ş: "s", ţ: "t" };
+      return map[m] || m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Format "25S7" → "2025 - S7", "25S19" → "2025 - S19"
 function formatSessionLabel(prefix) {
   const match = prefix.match(/^(\d{2})(S.+)$/i);
@@ -166,8 +179,11 @@ async function syncUIWithLocalStorage() {
       const currentStatus = currentStatusIcon?.getAttribute("title") || "Unknown";
       const storedStatus = storedPatient.importedStatus || "Unknown";
 
-      const incompleteStatuses = ["In lucru", "Rezultate partiale"];
-      if (incompleteStatuses.includes(storedStatus) && currentStatus === "Efectuat cu rezultate") {
+      const incompleteStatuses = ["in lucru", "rezultate partiale"];
+      if (
+        incompleteStatuses.includes(normalizeStatusTitle(storedStatus)) &&
+        normalizeStatusTitle(currentStatus) === "efectuat cu rezultate"
+      ) {
         if (!storedPatient.statusChangedSinceImport) {
           storedPatient.statusChangedSinceImport = true;
           statusChangesDetected++;
