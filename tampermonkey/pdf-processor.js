@@ -63,10 +63,10 @@ class PDFProcessor {
       return extractedData;
     } catch (error) {
       console.error("Error extracting PDF text:", error);
-      return {
-        patientInfo: patientData,
-        error: error.message,
-      };
+      // Rethrow: the caller needs the real failure so it can run the PDF.js
+      // worker cleanup and store a PDF_PROCESSING_ERROR record. Returning an
+      // { error } object here made a failed extraction look like a success.
+      throw error;
     }
   }
 

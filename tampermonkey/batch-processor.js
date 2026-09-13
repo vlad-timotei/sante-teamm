@@ -744,6 +744,15 @@ async function refetchPatientData(patientKey, rowElement) {
       existingPatient.lastRefetchAt = Date.now();
       existingPatient.exportedTests = oldExportedTests;
       delete existingPatient.extractedText;
+      // Clear any error left over from a previous failed extraction, otherwise
+      // displayTestResults keeps rendering it and hides the results we just got.
+      delete existingPatient.error;
+      delete existingPatient.errorDetails;
+      delete existingPatient.status;
+      delete existingPatient.errorType;
+      delete existingPatient.fullError;
+      delete existingPatient.pdfSize;
+      delete existingPatient.availableLinks;
 
       const statusIcon = rowElement?.querySelector(".glyphicon");
       if (statusIcon) {
