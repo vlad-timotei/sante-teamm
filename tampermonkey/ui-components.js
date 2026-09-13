@@ -65,10 +65,89 @@ function hideCharismaFooter() {
         dashLink.onclick = (e) => { e.preventDefault(); window.openTestAdmin(); };
         bottomBar.appendChild(dashLink);
 
+        const authBox = document.createElement("span");
+        authBox.id = "sante-auth-footer";
+        authBox.style.cssText = `
+          display: inline-flex; align-items: center; gap: 8px;
+          font-size: 12px; color: #666; white-space: nowrap;
+        `;
+        bottomBar.appendChild(authBox);
+        renderAuthFooter();
+
         document.querySelector(".form-horizontal")?.appendChild(bottomBar);
       }
     }
   }
+}
+
+// Which account the sync uses (centruldumbrava.ro/analize), shown in the bottom
+// bar next to Sante's own welcome/logout row. The credentials live in GM
+// storage, so without this there is no way to see or change the account short
+// of clearing the userscript's data by hand.
+async function renderAuthFooter() {
+  const box = document.getElementById("sante-auth-footer");
+  if (!box || !window.SyncManager) return;
+
+  const linkCss = `
+    color: #17a2b8; text-decoration: none; font-size: 12px;
+    font-weight: bold; white-space: nowrap; cursor: pointer;
+  `;
+  const username = await window.SyncManager.getUsername();
+  box.innerHTML = "";
+
+  if (!username) {
+    const loginLink = document.createElement("a");
+    loginLink.href = "#";
+    loginLink.textContent = "🔐 Autentificare";
+    loginLink.style.cssText = linkCss;
+    loginLink.onclick = async (e) => {
+      e.preventDefault();
+      await window.SyncManager.login();
+      renderAuthFooter();
+    };
+    box.appendChild(loginLink);
+    return;
+  }
+
+  const who = document.createElement("span");
+  who.textContent = `👤 ${username}`;
+  who.title = "Cont sincronizare (Analize)";
+  box.appendChild(who);
+
+  const logoutLink = document.createElement("a");
+  logoutLink.href = "#";
+  logoutLink.textContent = "Deconectare";
+  logoutLink.style.cssText = linkCss;
+  logoutLink.onclick = (e) => {
+    e.preventDefault();
+    // Inline confirmation rather than confirm(): a native dialog is exactly what
+    // the login flow just stopped using, and logging out costs a re-typed
+    // password, so a stray click shouldn't do it.
+    box.innerHTML = "";
+
+    const question = document.createElement("span");
+    question.textContent = "Te deconectezi?";
+    box.appendChild(question);
+
+    const yes = document.createElement("a");
+    yes.href = "#";
+    yes.textContent = "Da";
+    yes.style.cssText = linkCss + "color: #c0392b;";
+    yes.onclick = async (ev) => {
+      ev.preventDefault();
+      await window.SyncManager.logout();
+      renderAuthFooter();
+    };
+    box.appendChild(yes);
+
+    const no = document.createElement("a");
+    no.href = "#";
+    no.textContent = "Nu";
+    no.style.cssText = linkCss;
+    no.onclick = (ev) => { ev.preventDefault(); renderAuthFooter(); };
+    box.appendChild(no);
+  };
+  box.appendChild(logoutLink);
 }
 
 function makeFiltersCollapsible() {
@@ -1149,6 +1228,7 @@ async function reimportAllForPatient(patientKey) {
 
 // Export to window
 window.hideCharismaFooter = hideCharismaFooter;
+window.renderAuthFooter = renderAuthFooter;
 window.makeFiltersCollapsible = makeFiltersCollapsible;
 window.addTestResultsColumn = addTestResultsColumn;
 window.hideUnwantedColumns = hideUnwantedColumns;
