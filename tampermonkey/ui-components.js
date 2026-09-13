@@ -72,9 +72,12 @@ function hideCharismaFooter() {
           font-size: 12px; color: #666; white-space: nowrap;
         `;
         bottomBar.appendChild(authBox);
-        renderAuthFooter();
 
         document.querySelector(".form-horizontal")?.appendChild(bottomBar);
+        // After the bar is in the document: renderAuthFooter() looks the box up
+        // by id, so calling it on a still-detached bottomBar found nothing and
+        // returned without drawing the account row.
+        renderAuthFooter();
       }
     }
   }
